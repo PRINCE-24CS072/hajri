@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hajri OCR - Interactive Tuning</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 { color: #667eea; margin-bottom: 8px; }
+        .subtitle { color: #666; }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .preset-btn {
+            width: 100%;
+            padding: 16px;
+            margin: 8px 0;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 16px;
+        }
+        .preset-btn:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+        .preset-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        .preset-info {
+            font-size: 13px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .slider-group {
+            margin: 16px 0;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        .slider-value {
+            color: #667eea;
+            font-weight: bold;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #ddd;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+        .checkbox-group {
+            margin: 16px 0;
+            display: flex;
+            align-items: center;
+        }
+        .checkbox-group input {
+            width: 20px;
+            height: 20px;
+            margin-right: 12px;
+        }
+        button.action-btn {
+            width: 100%;
+            padding: 14px;
+            margin: 8px 0;
+            border: none;
+            border-radius: 8px;
+            background: #667eea;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        button.action-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        .test-result {
+            margin-top: 16px;
+            padding: 16px;
+            border-radius: 8px;
+            background: #f5f7fa;
+            display: none;
+        }
+        .test-result.show { display: block; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .tips {
+            background: #fff3cd;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+        }
+        .tips h3 { margin-bottom: 8px; color: #856404; }
+        .tips li { margin: 4px 0; color: #856404; }
+        .metric { 
+            display: inline-block;
+            margin: 8px 12px 8px 0;
+            padding: 8px 12px;
+            background: #f5f7fa;
+            border-radius: 6px;
+        }
+        .metric-label { font-size: 12px; color: #666; }
+        .metric-value { font-size: 20px; font-weight: bold; color: #667eea; }
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Hajri OCR - Interactive Tuning</h1>
+            <p class="subtitle">Optimize speed vs accuracy in real-time</p>
+        </div>
+
+        <div class="grid">
+            <!-- Presets -->
+            <div class="card">
+                <h2>⚡ Quick Presets</h2>
+                <button class="preset-btn" onclick="setPreset('fast', this)">
+                    <strong>FAST</strong>
+                    <div class="preset-info">~1-2s per image • Good for testing</div>
+                </button>
+                <button class="preset-btn active" onclick="setPreset('balanced', this)">
+                    <strong>BALANCED (Recommended)</strong>
+                    <div class="preset-info">~2-4s per image • Best overall</div>
+                </button>
+                <button class="preset-btn" onclick="setPreset('accurate', this)">
+                    <strong>ACCURATE</strong>
+                    <div class="preset-info">~4-8s per image • Maximum quality</div>
+                </button>
+
+                <div class="tips">
+                    <h3>💡 Quick Tips</h3>
+                    <ul>
+                        <li>Start with BALANCED</li>
+                        <li>Too slow? Switch to FAST</li>
+                        <li>Missing text? Try ACCURATE or adjust sliders below</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Manual Tuning -->
+            <div class="card">
+                <h2>🎛️ Manual Fine-Tuning</h2>
+                
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span>Image Size</span>
+                        <span class="slider-value" id="val-size">960</span>
+                    </div>
+                    <input type="range" id="det-limit" min="640" max="1920" step="320" value="960" 
+                           oninput="updateValue('val-size', this.value)">
+                    <small>Smaller = faster, Larger = more accurate</small>
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span>Confidence Threshold</span>
+                        <span class="slider-value" id="val-confidence">0.30</span>
+                    </div>
+                    <input type="range" id="drop-score" min="0.2" max="0.7" step="0.05" value="0.30"
+                           oninput="updateValue('val-confidence', parseFloat(this.value).toFixed(2))">
+                    <small>Lower = keep more text, Higher = strict quality</small>
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span>Table Detection</span>
+                        <span class="slider-value" id="val-table">40</span>
+                    </div>
+                    <input type="range" id="min-confidence" min="30" max="70" step="5" value="40"
+                           oninput="updateValue('val-table', this.value)">
+                    <small>Lower = find more tables, Higher = stricter</small>
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span>CPU Threads</span>
+                        <span class="slider-value" id="val-threads">4</span>
+                    </div>
+                    <input type="range" id="cpu-threads" min="2" max="8" step="1" value="4"
+                           oninput="updateValue('val-threads', this.value)">
+                    <small>More threads = faster (if you have the cores)</small>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="angle-cls">
+                    <label>Detect Rotated Text (slower, usually not needed)</label>
+                </div>
+
+                <button class="action-btn" onclick="applyCustomConfig()">Apply Custom Settings</button>
+            </div>
+        </div>
+
+        <!-- Test Section -->
+        <div class="card" style="margin-top: 20px;">
+            <h2>🧪 Test Your Settings</h2>
+            <input type="file" id="test-file" accept="image/*" style="margin: 16px 0;">
+            <button class="action-btn" onclick="testOCR()">Test OCR Speed & Accuracy</button>
+            
+            <div id="test-result" class="test-result">
+                <div class="metric">
+                    <div class="metric-label">Processing Time</div>
+                    <div class="metric-value" id="time-result">-</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Entries Found</div>
+                    <div class="metric-value" id="entries-result">-</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Avg Confidence</div>
+                    <div class="metric-value" id="conf-result">-</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Config -->
+        <div class="card" style="margin-top: 20px;">
+            <h2>📊 Current Configuration</h2>
+            <pre id="current-config" style="background: #f5f7fa; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 13px;"></pre>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+
+        // Update slider value displays
+        function updateValue(id, value) {
+            document.getElementById(id).textContent = value;
+        }
+
+        // Set preset
+        async function setPreset(preset, buttonElement) {
+            try {
+                const response = await fetch(`${API_URL}/config/preset/${preset}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                // Update UI
+                document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
+                if (buttonElement) {
+                    buttonElement.classList.add('active');
+                }
+                
+                // Show success
+                alert(`✅ Switched to ${preset.toUpperCase()} preset\n\nEstimated time: ${data.estimated_time}`);
+                
+                // Refresh current config
+                loadCurrentConfig();
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+
+        // Apply custom config
+        async function applyCustomConfig() {
+            const config = {
+                use_angle_cls: document.getElementById('angle-cls').checked,
+                det_limit_side_len: parseInt(document.getElementById('det-limit').value),
+                drop_score: parseFloat(document.getElementById('drop-score').value),
+                min_confidence: parseInt(document.getElementById('min-confidence').value),
+                cpu_threads: parseInt(document.getElementById('cpu-threads').value)
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/config/custom`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    alert('✅ Custom settings applied!');
+                    loadCurrentConfig();
+                } else {
+                    alert('❌ Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+
+        // Test OCR
+        async function testOCR() {
+            const fileInput = document.getElementById('test-file');
+            if (!fileInput.files[0]) {
+                alert('Please select an image first!');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            const resultDiv = document.getElementById('test-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<p>⏳ Processing...</p>';
+
+            try {
+                const startTime = Date.now();
+                const response = await fetch(`${API_URL}/ocr/extract`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
+
+                if (data.success) {
+                    document.getElementById('time-result').textContent = `${processingTime}s`;
+                    document.getElementById('entries-result').textContent = data.entries.length;
+                    document.getElementById('conf-result').textContent = 
+                        (data.metadata?.avg_confidence?.toFixed(1) || 'N/A') + '%';
+                    
+                    resultDiv.className = 'test-result show success';
+                    resultDiv.innerHTML = `
+                        <strong>✅ Success!</strong><br>
+                        <div class="metric">
+                            <div class="metric-label">Processing Time</div>
+                            <div class="metric-value">${processingTime}s</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Entries Found</div>
+                            <div class="metric-value">${data.entries.length}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Avg Confidence</div>
+                            <div class="metric-value">${(data.metadata?.avg_confidence?.toFixed(1) || 'N/A')}%</div>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.className = 'test-result show error';
+                    resultDiv.innerHTML = `<strong>❌ Error:</strong> ${data.error}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'test-result show error';
+                resultDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+            }
+        }
+
+        // Load current config
+        async function loadCurrentConfig() {
+            try {
+                const response = await fetch(`${API_URL}/config/current`);
+                const data = await response.json();
+                document.getElementById('current-config').textContent = 
+                    JSON.stringify(data.config, null, 2);
+            } catch (error) {
+                console.error('Failed to load config:', error);
+            }
+        }
+
+        // Load on page load
+        loadCurrentConfig();
+    </script>
+</body>
+</html>

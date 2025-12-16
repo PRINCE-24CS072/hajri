@@ -1,0 +1,56 @@
+{
+  "courses": {
+    "CEUC101": {
+      "name": "COMPUTER CONCEPTS AND PROGRAMMING",
+      "abbr": "CCP"
+    },
+    "CEUC201": {
+      "name": "FUNDAMENTALS OF SOFTWARE ENGINEERING",
+      "abbr": "FSE"
+    },
+    "CEUC202": {
+      "name": "COMPUTER ORGANIZATION AND ARCHITECTURE",
+      "abbr": "COA"
+    },
+    "CUUV102": {
+      "name": "PROFESSIONAL ETHICS AND SUSTAINABILITY",
+      "abbr": "PES"
+    },
+    "EEUD101": {
+      "name": "BASIC ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "abbr": "BEEE"
+    },
+    "HSUA101": {
+      "name": "COMMUNICATION ENGLISH",
+      "abbr": "CE"
+    },
+    "ITUS101": {
+      "name": "INFORMATION AND COMMUNICATION TECHNOLOGY",
+      "abbr": "ICT"
+    },
+    "ITUC202": {
+      "name": "FUNDAMENTALS OF DATABASE MANAGEMENT SYSTEMS",
+      "abbr": "FDMS"
+    },
+    "ITUE204": {
+      "name": "DESIGN AND ANALYSIS OF ALGORITHMS",
+      "abbr": "DAA"
+    },
+    "ITUE205": {
+      "name": "FUNDAMENTALS OF INFORMATION SECURITY",
+      "abbr": "FIS"
+    },
+    "MSUD101": {
+      "name": "ENGINEERING MATHEMATICS I",
+      "abbr": "EM-I"
+    },
+    "PSUD101": {
+      "name": "ENGINEERING PHYSICS I",
+      "abbr": "EP-I"
+    }
+  },
+  "validation": {
+    "fuzzy_match_threshold": 0.75,
+    "min_confidence": 0.6
+  }
+}

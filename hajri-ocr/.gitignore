@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+
+# Test images (don't commit user data)
+test_images/
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PaddleOCR cache
+inference/
+*.pdparams
+*.pdiparams

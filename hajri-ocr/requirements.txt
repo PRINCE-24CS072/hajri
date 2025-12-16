@@ -1,0 +1,19 @@
+# Production dependencies - Only what we actually use
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.19
+paddleocr==2.7.3
+paddlepaddle==3.0.0b2
+opencv-python-headless==4.10.0.84
+Pillow==11.0.0
+numpy==1.26.4
+pydantic==2.10.4
+python-dotenv==1.0.1
+
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.23.3
+httpx==0.26.0
+
+# Utilities
+python-magic-bin==0.4.14  # Windows compatible
