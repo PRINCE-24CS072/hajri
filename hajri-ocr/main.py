@@ -1,13 +1,14 @@
 """
 FastAPI OCR Backend for Hajri Attendance Tracker
 """
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import os
 from pathlib import Path
 import logging
 import json
+from typing import Optional
 from dotenv import load_dotenv
 
 from config import settings
@@ -60,6 +61,12 @@ async def serve_test():
     return FileResponse("test.html")
 
 
+@app.get("/tuning.html")
+async def serve_tuning():
+    """Serve interactive tuning UI"""
+    return FileResponse("tuning.html")
+
+
 @app.get("/courses.html")
 async def serve_courses_manager():
     """Serve course management UI"""
@@ -81,16 +88,23 @@ async def extract_attendance(file: UploadFile = File(...)):
         if size_mb > settings.max_image_size_mb:
             raise HTTPException(400, f"File too large: {size_mb:.2f}MB")
         
-        # Preprocess image (preserves table lines)
-        processed_image = preprocessor.preprocess_screenshot(image_bytes)
+        # Preprocess image with modal detection
+        logger.info("Preprocessing image with modal detection...")
+        processed_image, preprocess_debug = preprocessor.preprocess_screenshot(
+            image_bytes,
+            ocr_engine=extractor._get_ocr(),  # Reuse OCR engine
+            detect_modal=True  # Enable modal detection
+        )
+        
+        logger.info(f"Preprocessing complete. Modal detected: {preprocess_debug.get('modal_detected')}")
         
         # Extract attendance entries
         entries = extractor.extract_table_data(processed_image)
         
         return OCRResponse(
             success=True,
-            entries=entries,
-            count=len(entries)
+            message=f"Extracted {len(entries)} attendance entries",
+            entries=entries
         )
         
     except HTTPException:
@@ -98,6 +112,81 @@ async def extract_attendance(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"OCR failed: {str(e)}")
         raise HTTPException(500, f"OCR failed: {str(e)}")
+
+
+@app.post("/ocr/extract/tuning")
+async def extract_attendance_tuning(
+    file: UploadFile = File(...),
+    x_tuning_params: Optional[str] = Header(None)
+):
+    """Extract with custom tuning parameters and debug output"""
+    try:
+        # Validate file type
+        if not file.content_type.startswith('image/'):
+            raise HTTPException(400, "File must be an image")
+        
+        # Read and validate file size
+        image_bytes = await file.read()
+        size_mb = len(image_bytes) / (1024 * 1024)
+        
+        if size_mb > settings.max_image_size_mb:
+            raise HTTPException(400, f"File too large: {size_mb:.2f}MB")
+        
+        # Parse tuning parameters
+        params = {}
+        if x_tuning_params:
+            try:
+                params = json.loads(x_tuning_params)
+            except json.JSONDecodeError:
+                logger.warning("Invalid tuning params JSON")
+        
+        # Apply tuning parameters to extractor
+        if 'region_split' in params:
+            extractor.region_split_threshold = float(params['region_split'])
+        if 'row_tolerance' in params:
+            extractor.row_tolerance = float(params['row_tolerance'])
+        if 'min_tokens' in params:
+            extractor.min_tokens_per_row = int(params['min_tokens'])
+        if 'det_thresh' in params:
+            extractor.config['det_db_thresh'] = float(params['det_thresh'])
+            extractor.paddle_ocr = None  # Force reload
+        if 'box_thresh' in params:
+            extractor.config['det_db_box_thresh'] = float(params['box_thresh'])
+            extractor.paddle_ocr = None  # Force reload
+        if 'drop_score' in params:
+            extractor.config['drop_score'] = float(params['drop_score'])
+            extractor.paddle_ocr = None  # Force reload
+        
+        # Preprocess image
+        processed_image = preprocessor.preprocess_screenshot(image_bytes)
+        
+        # Extract with debug mode enabled
+        debug_mode = params.get('debug', False)
+        entries = extractor.extract_table_data(processed_image, debug=debug_mode)
+        
+        # Build response with debug info
+        response = {
+            "success": True,
+            "message": f"Extracted {len(entries)} attendance entries",
+            "entries": [entry.model_dump() for entry in entries],
+            "debug": extractor.debug_info if debug_mode else {},
+            "params_used": {
+                "region_split": extractor.region_split_threshold,
+                "row_tolerance": extractor.row_tolerance,
+                "min_tokens": extractor.min_tokens_per_row,
+                "det_thresh": extractor.config['det_db_thresh'],
+                "box_thresh": extractor.config['det_db_box_thresh'],
+                "drop_score": extractor.config['drop_score']
+            }
+        }
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Tuning extraction failed: {str(e)}")
+        raise HTTPException(500, f"Extraction failed: {str(e)}")
 
 
 @app.get("/courses")

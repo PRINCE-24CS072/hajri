@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OCR Tuning Studio</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #0b1220;
+      --accent: #7c3aed;
+      --accent-2: #22d3ee;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --border: #1f2937;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at 20% 20%, rgba(124, 58, 237, 0.12), transparent 25%),
+                  radial-gradient(circle at 80% 0%, rgba(34, 211, 238, 0.12), transparent 30%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 24px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(120deg, rgba(124, 58, 237, 0.14), rgba(34, 211, 238, 0.12));
+    }
+
+    header h1 { margin: 0; font-size: 22px; letter-spacing: 0.2px; }
+    header .pill {
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(124, 58, 237, 0.2);
+      color: var(--accent-2);
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      min-height: calc(100vh - 72px);
+    }
+
+    .side {
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    .main {
+      padding: 20px;
+      background: var(--panel-2);
+      overflow-y: auto;
+    }
+
+    .card {
+      background: #0f1629;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+
+    .card h3 {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      letter-spacing: 0.3px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .upload {
+      border: 1.5px dashed var(--border);
+      border-radius: 12px;
+      padding: 22px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: rgba(255,255,255,0.01);
+    }
+    .upload:hover { border-color: var(--accent); background: rgba(124,58,237,0.05); }
+    .upload.drag { border-color: var(--accent-2); background: rgba(34,211,238,0.07); }
+
+    .btn {
+      width: 100%;
+      margin-top: 10px;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(120deg, var(--accent), #5b21b6);
+      color: white;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      cursor: pointer;
+      transition: transform 0.1s ease, box-shadow 0.2s ease;
+      box-shadow: 0 10px 30px rgba(124, 58, 237, 0.35);
+    }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 14px 36px rgba(124, 58, 237, 0.45); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn.secondary {
+      background: #1f2937;
+      box-shadow: none;
+    }
+
+    .control {
+      margin-bottom: 14px;
+    }
+    .control label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .control .val { color: var(--accent-2); font-weight: 700; }
+
+    input[type=range] {
+      width: 100%;
+      -webkit-appearance: none;
+      height: 6px;
+      border-radius: 999px;
+      background: #1f2937;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: linear-gradient(120deg, var(--accent), var(--accent-2));
+      cursor: pointer;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+    }
+
+    .preview-wrap {
+      position: relative;
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      min-height: 360px;
+    }
+    .preview-wrap img { width: 100%; display: block; }
+    .overlay { position: absolute; inset: 0; pointer-events: none; }
+    .legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    th { color: var(--muted); font-weight: 600; }
+
+    .pill-small {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 11px;
+      background: rgba(34, 197, 94, 0.15);
+      color: #34d399;
+    }
+    .pill-small.lab { background: rgba(59, 130, 246, 0.15); color: #93c5fd; }
+
+    .status {
+      padding: 10px 12px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status.ok { background: rgba(34, 197, 94, 0.15); color: #34d399; }
+    .status.err { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+    .status.info { background: rgba(59, 130, 246, 0.12); color: #93c5fd; }
+
+    .flex { display: flex; gap: 12px; align-items: center; }
+    .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+    .stat { padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: #0f1629; text-align: center; }
+    .stat .num { font-size: 18px; font-weight: 800; color: var(--accent-2); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>OCR Tuning Studio</h1>
+    <div class="pill">Live Overlay · Debug Enabled</div>
+  </header>
+  <div class="app">
+    <aside class="side">
+      <div class="card">
+        <h3>Upload</h3>
+        <div class="upload" id="uploadZone">
+          <div style="font-size: 32px; margin-bottom: 6px;">📤</div>
+          <div style="font-weight: 700;">Click or drop image</div>
+          <div style="color: var(--muted); font-size: 12px; margin-top: 6px;">PNG / JPG</div>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" style="display:none" />
+        <button class="btn" id="extractBtn" disabled>Run Extraction</button>
+        <button class="btn secondary" id="resetBtn">Reset Params</button>
+      </div>
+
+      <div class="card">
+        <h3>Region Split</h3>
+        <div class="control">
+          <label>Threshold (% of width) <span class="val" id="splitVal">52%</span></label>
+          <input type="range" id="split" min="40" max="65" step="1" value="52" />
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Row Clustering</h3>
+        <div class="control">
+          <label>Y Tolerance (px) <span class="val" id="tolVal">26</span></label>
+          <input type="range" id="tolerance" min="10" max="40" step="1" value="26" />
+        </div>
+        <div class="control">
+          <label>Min Tokens per Row <span class="val" id="minTokVal">2</span></label>
+          <input type="range" id="minTok" min="1" max="5" step="1" value="2" />
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>OCR Thresholds</h3>
+        <div class="control">
+          <label>Det Threshold <span class="val" id="detVal">0.20</span></label>
+          <input type="range" id="det" min="0.10" max="0.50" step="0.01" value="0.20" />
+        </div>
+        <div class="control">
+          <label>Box Threshold <span class="val" id="boxVal">0.30</span></label>
+          <input type="range" id="box" min="0.10" max="0.70" step="0.01" value="0.30" />
+        </div>
+        <div class="control">
+          <label>Drop Score <span class="val" id="dropVal">0.20</span></label>
+          <input type="range" id="drop" min="0.10" max="0.50" step="0.01" value="0.20" />
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div id="statusBar" class="status info">Load an image to begin</div>
+
+      <div class="card">
+        <div class="legend">
+          <span><span class="dot" style="background:#22c55e"></span>Left tokens</span>
+          <span><span class="dot" style="background:#ef4444"></span>Right tokens</span>
+          <span><span class="dot" style="background:#eab308"></span>Row clusters</span>
+          <span><span class="dot" style="background:#38bdf8"></span>Split line</span>
+        </div>
+        <div class="preview-wrap">
+          <img id="preview" alt="preview" />
+          <canvas id="overlay" class="overlay"></canvas>
+        </div>
+      </div>
+
+      <div class="card" id="statsCard" style="display:none">
+        <h3>Stats</h3>
+        <div class="grid2">
+          <div class="stat"><div class="num" id="statEntries">0</div><div class="lbl">Entries</div></div>
+          <div class="stat"><div class="num" id="statLeft">0</div><div class="lbl">Left Tokens</div></div>
+          <div class="stat"><div class="num" id="statRight">0</div><div class="lbl">Right Tokens</div></div>
+          <div class="stat"><div class="num" id="statDict">0</div><div class="lbl">Dictionary Size</div></div>
+        </div>
+      </div>
+
+      <div class="card" id="entriesCard" style="display:none">
+        <h3>Extracted Entries</h3>
+        <div style="overflow-x:auto;">
+          <table id="entriesTable"></table>
+        </div>
+      </div>
+
+      <div class="card" id="dictCard" style="display:none">
+        <h3>Course Dictionary</h3>
+        <div style="overflow-x:auto;">
+          <table id="dictTable"></table>
+        </div>
+      </div>
+
+      <div class="card" id="rowsCard" style="display:none">
+        <h3>Left Row Clusters</h3>
+        <div id="rowsList" style="display:grid; gap:10px;"></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Elements
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('fileInput');
+    const extractBtn = document.getElementById('extractBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const statusBar = document.getElementById('statusBar');
+    const preview = document.getElementById('preview');
+    const overlay = document.getElementById('overlay');
+
+    const sliders = {
+      split: document.getElementById('split'),
+      tolerance: document.getElementById('tolerance'),
+      minTok: document.getElementById('minTok'),
+      det: document.getElementById('det'),
+      box: document.getElementById('box'),
+      drop: document.getElementById('drop')
+    };
+    const vals = {
+      splitVal: document.getElementById('splitVal'),
+      tolVal: document.getElementById('tolVal'),
+      minTokVal: document.getElementById('minTokVal'),
+      detVal: document.getElementById('detVal'),
+      boxVal: document.getElementById('boxVal'),
+      dropVal: document.getElementById('dropVal')
+    };
+
+    let currentFile = null;
+    let currentDataUrl = null;
+    let debugPayload = null;
+
+    // Slider live values
+    sliders.split.oninput = e => vals.splitVal.textContent = e.target.value + '%';
+    sliders.tolerance.oninput = e => vals.tolVal.textContent = e.target.value;
+    sliders.minTok.oninput = e => vals.minTokVal.textContent = e.target.value;
+    sliders.det.oninput = e => vals.detVal.textContent = (+e.target.value).toFixed(2);
+    sliders.box.oninput = e => vals.boxVal.textContent = (+e.target.value).toFixed(2);
+    sliders.drop.oninput = e => vals.dropVal.textContent = (+e.target.value).toFixed(2);
+
+    // Upload handlers
+    uploadZone.addEventListener('click', () => fileInput.click());
+    uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag'));
+    uploadZone.addEventListener('drop', e => {
+      e.preventDefault(); uploadZone.classList.remove('drag');
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) handleFile(file);
+    });
+    fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+    function handleFile(file) {
+      currentFile = file;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        currentDataUrl = ev.target.result;
+        preview.src = currentDataUrl;
+        extractBtn.disabled = false;
+        status('info', 'Image loaded. Adjust sliders and run extraction.');
+        // Clear overlays
+        clearOverlay();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function status(type, msg) {
+      statusBar.className = 'status ' + (type === 'ok' ? 'ok' : type === 'err' ? 'err' : 'info');
+      statusBar.textContent = msg;
+    }
+
+    resetBtn.onclick = () => {
+      sliders.split.value = 52; vals.splitVal.textContent = '52%';
+      sliders.tolerance.value = 26; vals.tolVal.textContent = '26';
+      sliders.minTok.value = 2; vals.minTokVal.textContent = '2';
+      sliders.det.value = 0.20; vals.detVal.textContent = '0.20';
+      sliders.box.value = 0.30; vals.boxVal.textContent = '0.30';
+      sliders.drop.value = 0.20; vals.dropVal.textContent = '0.20';
+    };
+
+    extractBtn.onclick = async () => {
+      if (!currentFile) return;
+      extractBtn.disabled = true;
+      status('info', 'Running OCR...');
+      clearOverlay();
+
+      const params = {
+        region_split: parseFloat(sliders.split.value) / 100,
+        row_tolerance: parseFloat(sliders.tolerance.value),
+        min_tokens: parseInt(sliders.minTok.value),
+        det_thresh: parseFloat(sliders.det.value),
+        box_thresh: parseFloat(sliders.box.value),
+        drop_score: parseFloat(sliders.drop.value),
+        debug: true
+      };
+
+      const form = new FormData();
+      form.append('file', currentFile);
+
+      try {
+        const res = await fetch('/ocr/extract/tuning', {
+          method: 'POST',
+          body: form,
+          headers: { 'X-Tuning-Params': JSON.stringify(params) }
+        });
+        const data = await res.json();
+        debugPayload = data.debug || {};
+        renderResults(data);
+        drawOverlay(debugPayload);
+        status('ok', data.message || 'Done');
+      } catch (err) {
+        console.error(err);
+        status('err', 'Failed: ' + err.message);
+      } finally {
+        extractBtn.disabled = false;
+      }
+    };
+
+    function renderResults(data) {
+      const entries = data.entries || [];
+      const debug = data.debug || {};
+
+      document.getElementById('statsCard').style.display = 'block';
+      document.getElementById('statEntries').textContent = entries.length;
+      document.getElementById('statLeft').textContent = debug.left_tokens?.length || 0;
+      document.getElementById('statRight').textContent = debug.right_tokens?.length || 0;
+      document.getElementById('statDict').textContent = Object.keys(debug.course_dict || {}).length;
+
+      // Entries table
+      const entriesTable = document.getElementById('entriesTable');
+      if (entries.length) {
+        document.getElementById('entriesCard').style.display = 'block';
+        entriesTable.innerHTML = '<thead><tr><th>Course</th><th>Name</th><th>Type</th><th>Present</th><th>Total</th><th>%</th><th>Conf</th></tr></thead>';
+        const tbody = document.createElement('tbody');
+        entries.forEach(e => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><strong>${e.course_code}</strong></td>
+            <td>${e.course_name}</td>
+            <td>${e.class_type === 'LECT' ? '<span class="pill-small">LECT</span>' : '<span class="pill-small lab">LAB</span>'}</td>
+            <td>${e.present}</td>
+            <td>${e.total}</td>
+            <td>${e.percentage}</td>
+            <td>${(e.confidence * 100).toFixed(1)}%</td>
+          `;
+          tbody.appendChild(tr);
+        });
+        entriesTable.appendChild(tbody);
+      } else {
+        document.getElementById('entriesCard').style.display = 'none';
+      }
+
+      // Dictionary table
+      const dict = debug.course_dict || {};
+      const dictTable = document.getElementById('dictTable');
+      if (Object.keys(dict).length) {
+        document.getElementById('dictCard').style.display = 'block';
+        dictTable.innerHTML = '<thead><tr><th>Code</th><th>Name</th></tr></thead>';
+        const tbody = document.createElement('tbody');
+        Object.entries(dict).forEach(([c, n]) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td><strong>${c}</strong></td><td>${n}</td>`;
+          tbody.appendChild(tr);
+        });
+        dictTable.appendChild(tbody);
+      } else {
+        document.getElementById('dictCard').style.display = 'none';
+      }
+
+      // Row clusters
+      const rows = debug.left_rows || [];
+      const rowsList = document.getElementById('rowsList');
+      if (rows.length) {
+        document.getElementById('rowsCard').style.display = 'block';
+        rowsList.innerHTML = '';
+        rows.forEach((row, idx) => {
+          const div = document.createElement('div');
+          div.className = 'card';
+          div.style.margin = 0;
+          div.innerHTML = `<div style="color: var(--muted); font-size: 12px; margin-bottom: 6px;">Row ${idx + 1} (${row.length} tokens)</div>`;
+          const chips = document.createElement('div');
+          chips.style.display = 'flex';
+          chips.style.flexWrap = 'wrap';
+          chips.style.gap = '6px';
+          row.forEach(tok => {
+            const chip = document.createElement('div');
+            chip.className = 'row-token';
+            chip.style.border = '1px solid var(--border)';
+            chip.style.padding = '6px 8px';
+            chip.style.borderRadius = '8px';
+            chip.style.background = '#111827';
+            chip.textContent = tok.text;
+            chips.appendChild(chip);
+          });
+          div.appendChild(chips);
+          rowsList.appendChild(div);
+        });
+      } else {
+        document.getElementById('rowsCard').style.display = 'none';
+      }
+    }
+
+    function clearOverlay() {
+      const ctx = overlay.getContext('2d');
+      ctx.clearRect(0, 0, overlay.width, overlay.height);
+    }
+
+    function drawOverlay(debug) {
+      if (!debug || !debug.left_tokens) return;
+      const tokens = [...(debug.left_tokens || []), ...(debug.right_tokens || [])];
+      if (!tokens.length) return;
+
+      // Infer canvas size from tokens if image size unknown
+      const maxX = Math.max(...tokens.map(t => Math.max(...t.box.map(p => p[0]))));
+      const maxY = Math.max(...tokens.map(t => Math.max(...t.box.map(p => p[1]))));
+
+      const targetWidth = overlay.parentElement.clientWidth || 900;
+      const scale = targetWidth / maxX;
+      const targetHeight = maxY * scale;
+      overlay.width = targetWidth;
+      overlay.height = targetHeight;
+      preview.style.width = targetWidth + 'px';
+
+      const ctx = overlay.getContext('2d');
+      ctx.clearRect(0, 0, overlay.width, overlay.height);
+      ctx.lineWidth = 2;
+
+      // Split line
+      if (debug.split_threshold) {
+        ctx.strokeStyle = '#38bdf8';
+        ctx.beginPath();
+        ctx.moveTo(debug.split_threshold * scale, 0);
+        ctx.lineTo(debug.split_threshold * scale, targetHeight);
+        ctx.stroke();
+      }
+
+      // Draw tokens
+      function drawBox(box, color) {
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(box[0][0]*scale, box[0][1]*scale);
+        for (let i=1; i<box.length; i++) {
+          ctx.lineTo(box[i][0]*scale, box[i][1]*scale);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+
+      (debug.left_tokens || []).forEach(tok => drawBox(tok.box, 'rgba(34,197,94,0.9)'));
+      (debug.right_tokens || []).forEach(tok => drawBox(tok.box, 'rgba(239,68,68,0.9)'));
+
+      // Row cluster hulls
+      if (debug.left_rows) {
+        ctx.strokeStyle = 'rgba(234,179,8,0.9)';
+        ctx.setLineDash([6,4]);
+        debug.left_rows.forEach(row => {
+          const xs = row.flatMap(t => t.box.map(p => p[0]));
+          const ys = row.flatMap(t => t.box.map(p => p[1]));
+          const minx = Math.min(...xs) * scale;
+          const maxx = Math.max(...xs) * scale;
+          const miny = Math.min(...ys) * scale;
+          const maxy = Math.max(...ys) * scale;
+          ctx.strokeRect(minx, miny, maxx - minx, maxy - miny);
+        });
+        ctx.setLineDash([]);
+      }
+    }
+  </script>
+</body>
+</html>

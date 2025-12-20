@@ -1,15 +1,38 @@
 """
 Image preprocessing for better OCR accuracy
+Includes modal detection and cropping for zoomed-out screenshots
 """
 import cv2
 import numpy as np
 from PIL import Image
-from typing import Tuple
+from typing import Tuple, Optional, Dict
 import io
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ImagePreprocessor:
-    """Handles image preprocessing for OCR"""
+    """
+    Handles image preprocessing for OCR
+    
+    Pipeline:
+    1. Load image
+    2. Initial resize (max 1920px width)
+    3. Detect and crop modal (removes background UI)
+    4. Normalize cropped modal
+    5. Light enhancement for OCR
+    """
+    
+    def __init__(self, enable_modal_detection: bool = True):
+        """
+        Initialize preprocessor
+        
+        Args:
+            enable_modal_detection: If True, automatically detect and crop modal
+        """
+        self.enable_modal_detection = enable_modal_detection
+        self.modal_detector = None  # Lazy initialization
     
     @staticmethod
     def load_image(image_bytes: bytes) -> np.ndarray:
@@ -204,28 +227,107 @@ class ImagePreprocessor:
         
         return result
     
-    def preprocess_screenshot(self, image_bytes: bytes) -> np.ndarray:
-        """Lightweight preprocessing for clean screenshots - preserves table lines"""
+    def preprocess_screenshot(
+        self, 
+        image_bytes: bytes, 
+        ocr_engine=None,
+        detect_modal: Optional[bool] = None
+    ) -> Tuple[np.ndarray, Dict]:
+        """
+        Full preprocessing pipeline with modal detection
+        
+        Pipeline:
+        1. Load and initial resize (max 1920px)
+        2. Detect and crop modal (if enabled)
+        3. Light enhancement for OCR
+        
+        Args:
+            image_bytes: Input image bytes
+            ocr_engine: Reuse PaddleOCR instance for modal detection
+            detect_modal: Override modal detection setting (default: use instance setting)
+        
+        Returns:
+            (preprocessed_image, debug_info)
+        """
         # Load image
         original = self.load_image(image_bytes)
         height, width = original.shape[:2]
         
-        # Upscale if needed (OCR works better on larger images)
-        if width < 1920:
-            scale = 1920 / width
-            new_width = int(width * scale)
-            new_height = int(height * scale)
-            resized = cv2.resize(original, (new_width, new_height), interpolation=cv2.INTER_CUBIC)
+        debug_info = {
+            'original_size': (width, height),
+            'modal_detected': False,
+            'modal_bounds': None,
+        }
+        
+        # Initial resize (max 1920px width for modal detection)
+        if width > 1920:
+            resized = self.resize_if_needed(original, max_width=1920)
+            logger.info(f"Resized from {width}x{height} to {resized.shape[1]}x{resized.shape[0]}")
         else:
             resized = original
         
-        # Very light denoising only
-        denoised = cv2.fastNlMeansDenoisingColored(resized, None, h=3, hColor=3, templateWindowSize=7, searchWindowSize=21)
+        # Determine if we should detect modal
+        should_detect = detect_modal if detect_modal is not None else self.enable_modal_detection
         
+        # Modal detection and cropping
+        if should_detect:
+            try:
+                from modal_detector import ModalDetector
+                
+                # Lazy initialize detector
+                if self.modal_detector is None:
+                    self.modal_detector = ModalDetector(ocr_engine=ocr_engine)
+                elif ocr_engine is not None:
+                    # Update OCR engine if provided
+                    self.modal_detector.ocr_engine = ocr_engine
+                
+                # Detect and crop modal
+                logger.info("Attempting modal detection...")
+                cropped, modal_debug = self.modal_detector.detect_and_crop_modal(resized)
+                
+                debug_info['modal_detected'] = True
+                debug_info['modal_bounds'] = modal_debug.get('crop_bounds')
+                debug_info['modal_detection_method'] = modal_debug.get('detection_method')
+                debug_info['normalized_size'] = modal_debug.get('normalized_size')
+                
+                logger.info(f"Modal detected and cropped: {cropped.shape[1]}x{cropped.shape[0]}px")
+                
+                # Use cropped modal for OCR
+                to_process = cropped
+                
+            except Exception as e:
+                logger.warning(f"Modal detection failed: {e}. Using full image.")
+                debug_info['modal_detection_error'] = str(e)
+                to_process = resized
+        else:
+            logger.info("Modal detection disabled, using full image")
+            to_process = resized
+        
+        # Light enhancement for OCR (minimal processing)
+        enhanced = self._light_enhance(to_process)
+        
+        debug_info['final_size'] = (enhanced.shape[1], enhanced.shape[0])
+        
+        return enhanced, debug_info
+    
+    def _light_enhance(self, image: np.ndarray) -> np.ndarray:
+        """
+        Light enhancement for OCR
+        
+        Minimal processing to preserve table structure:
+        - Very light sharpening
+        - No binarization
+        - No aggressive morphology
+        """
         # Slight sharpening to enhance text edges
-        kernel = np.array([[0, -0.5, 0],
-                          [-0.5, 3, -0.5],
-                          [0, -0.5, 0]])
-        sharpened = cv2.filter2D(denoised, -1, kernel)
+        kernel = np.array([
+            [0, -0.5, 0],
+            [-0.5, 3, -0.5],
+            [0, -0.5, 0]
+        ])
+        sharpened = cv2.filter2D(image, -1, kernel)
         
-        return sharpened
+        # Blend with original for subtle effect
+        enhanced = cv2.addWeighted(image, 0.7, sharpened, 0.3, 0)
+        
+        return enhanced

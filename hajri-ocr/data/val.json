@@ -1,0 +1,18 @@
+{
+  "data": [
+    {
+      "image": "B:\\hajri\\hajri-ocr\\imgs\\Screenshot 2024-10-19 082711.png",
+      "json": {
+        "semester": 3,
+        "attendance": []
+      }
+    },
+    {
+      "image": "B:\\hajri\\hajri-ocr\\imgs\\Screenshot_20251220_150659_Chrome.jpg",
+      "json": {
+        "semester": 3,
+        "attendance": []
+      }
+    }
+  ]
+}

@@ -1,15 +1,42 @@
 # HAJRI OCR - Attendance Table Extractor
 
-FastAPI backend that extracts attendance data from university dashboard screenshots using OCR + fuzzy matching.
+**Anchor-based OCR table extraction for university attendance screenshots**
 
-## Features
+## 🎯 What This Does
 
-- 📸 Screenshot-optimized image preprocessing
-- 🤖 PaddleOCR for text detection
-- 🎯 Fuzzy matching for course code auto-correction
-- 📚 Course database for accurate course names
-- 🌐 Course management web UI
-- ⚡ Production-ready for Render deployment
+Extracts attendance data from borderless table screenshots using deterministic, geometry-based OCR.
+
+**NO machine learning. NO training. NO datasets.**  
+Pure rule-based extraction using PaddleOCR + regex + geometry.
+
+## 🚀 Features
+
+- 🎯 **Zoom-Independent**: Automatic modal detection and cropping
+- ⚓ **Anchor-based extraction**: Rows defined by (course_code + class_type) pairs
+- 📐 **Geometry matching**: Column zoning + distance-based field attachment
+- 🔍 **Classical CV**: OCR-assisted modal detection (no heavy ML)
+- 💻 **CPU-only**: No GPU required
+- 🎨 **Debuggable**: Clear logic, extensive logging
+- ⚡ **FastAPI REST API**: Production-ready endpoints
+- 🖼️ **Test UI**: Interactive testing interface
+
+## 🏗️ System Architecture
+
+```
+Screenshot (any zoom level)
+ ↓
+Modal detection & crop ← NEW!
+ ↓
+Normalize to 1280px width
+ ↓
+PaddleOCR
+ ↓
+Anchor-based extraction
+ ↓
+JSON output
+```
+
+**Key Innovation:** The system automatically detects and crops the attendance modal, making it work reliably on both zoomed-in and zoomed-out screenshots.
 
 ## Quick Start
 

@@ -1,0 +1,591 @@
+{
+  "data": [
+    {
+      "image": "B:\\hajri\\hajri-ocr\\imgs\\dashboard.png",
+      "json": {
+        "semester": 3,
+        "attendance": [
+          {
+            "course_code": "CEUC201",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF SOFTWARE ENGINEERING"
+          },
+          {
+            "course_code": "CEUC202",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "COMPUTER ORGANIZATION AND ARCHITECTURE"
+          },
+          {
+            "course_code": "ITUC202",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF DATABASE MANAGEMENT SYSTEMS"
+          },
+          {
+            "course_code": "ITUE204",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "DESIGN AND ANALYSIS OF ALGORITHMS"
+          },
+          {
+            "course_code": "ITUE204",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "DESIGN AND ANALYSIS OF ALGORITHMS"
+          },
+          {
+            "course_code": "ITUE205",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF INFORMATION SECURITY"
+          },
+          {
+            "course_code": "ITUE205",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF INFORMATION SECURITY"
+          }
+        ]
+      }
+    },
+    {
+      "image": "B:\\hajri\\hajri-ocr\\imgs\\Screenshot 2024-10-19 082711.png",
+      "json": {
+        "semester": 3,
+        "attendance": []
+      }
+    },
+    {
+      "image": "B:\\hajri\\hajri-ocr\\imgs\\Screenshot 2024-10-22 201700.png",
+      "json": {
+        "semester": 3,
+        "attendance": []
+      }
+    },
+    {
+      "image": "B:\\hajri\\hajri-ocr\\imgs\\Screenshot 2024-10-22 201922.png",
+      "json": {
+        "semester": 3,
+        "attendance": []
+      }
+    },
+    {
+      "image": "B:\\hajri\\hajri-ocr\\imgs\\Screenshot 2025-12-16 170421.png",
+      "json": {
+        "semester": 3,
+        "attendance": [
+          {
+            "course_code": "CEUC201",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF SOFTWARE ENGINEERING"
+          },
+          {
+            "course_code": "CEUC202",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "COMPUTER ORGANIZATION AND ARCHITECTURE"
+          },
+          {
+            "course_code": "ITUC202",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF DATABASE MANAGEMENT SYSTEMS"
+          },
+          {
+            "course_code": "ITUE204",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "DESIGN AND ANALYSIS OF ALGORITHMS"
+          },
+          {
+            "course_code": "ITUE204",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "DESIGN AND ANALYSIS OF ALGORITHMS"
+          },
+          {
+            "course_code": "ITUE205",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF INFORMATION SECURITY"
+          },
+          {
+            "course_code": "ITUE205",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF INFORMATION SECURITY"
+          }
+        ]
+      }
+    },
+    {
+      "image": "B:\\hajri\\hajri-ocr\\imgs\\Screenshot 2025-12-20 125809.png",
+      "json": {
+        "semester": 3,
+        "attendance": [
+          {
+            "course_code": "CEUC201",
+            "class_type": "LECT",
+            "present": 2,
+            "total": 4,
+            "percentage": 50.0,
+            "course_name": "FUNDAMENTALS OF SOFTWARE ENGINEERING"
+          },
+          {
+            "course_code": "CEUC202",
+            "class_type": "LECT",
+            "present": 1,
+            "total": 3,
+            "percentage": 33.0,
+            "course_name": "COMPUTER ORGANIZATION AND ARCHITECTURE"
+          },
+          {
+            "course_code": "CEUP201",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "SOFTWARE GROUP PROJECT"
+          },
+          {
+            "course_code": "HSUV202",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "HUMAN VALUES AND ETHICS"
+          },
+          {
+            "course_code": "ITUC202",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF DATABASE MANAGEMENT SYSTEMS"
+          },
+          {
+            "course_code": "ITUC202",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF DATABASE MANAGEMENT SYSTEMS"
+          },
+          {
+            "course_code": "ITUE204",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "DESIGN AND ANALYSIS OF ALGORITHMS"
+          },
+          {
+            "course_code": "ITUE204",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "DESIGN AND ANALYSIS OF ALGORITHMS"
+          },
+          {
+            "course_code": "ITUE205",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF INFORMATION SECURITY"
+          },
+          {
+            "course_code": "ITUE205",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF INFORMATION SECURITY"
+          }
+        ]
+      }
+    },
+    {
+      "image": "B:\\hajri\\hajri-ocr\\imgs\\Screenshot 2025-12-20 134225.png",
+      "json": {
+        "semester": 3,
+        "attendance": [
+          {
+            "course_code": "CSUC201",
+            "class_type": "LECT",
+            "present": 42,
+            "total": 59,
+            "percentage": 71.0,
+            "course_name": "FUNDAMENTALS OF DATA STRUCTURE AND ALGORITHMS"
+          },
+          {
+            "course_code": "CSUC201",
+            "class_type": "LAB",
+            "present": 9,
+            "total": 13,
+            "percentage": 69.0,
+            "course_name": "FUNDAMENTALS OF DATA STRUCTURE AND ALGORITHMS"
+          },
+          {
+            "course_code": "HSUV201",
+            "class_type": "LAB",
+            "present": 7,
+            "total": 13,
+            "percentage": 53.0,
+            "course_name": "CREATIVITY, PROBLEM SOLVING AND INNOVATION"
+          },
+          {
+            "course_code": "ITUC201",
+            "class_type": "LECT",
+            "present": 34,
+            "total": 52,
+            "percentage": 65.0,
+            "course_name": "FUNDAMENTALS OF COMPUTER NETWORKS"
+          },
+          {
+            "course_code": "ITUC201",
+            "class_type": "LAB",
+            "present": 8,
+            "total": 12,
+            "percentage": 66.0,
+            "course_name": "FUNDAMENTALS OF COMPUTER NETWORKS"
+          },
+          {
+            "course_code": "ITUE203",
+            "class_type": "LECT",
+            "present": 27,
+            "total": 39,
+            "percentage": 69.0,
+            "course_name": "WEB DEVELOPMENT FRAMEWORKS"
+          },
+          {
+            "course_code": "ITUE203",
+            "class_type": "LAB",
+            "present": 16,
+            "total": 26,
+            "percentage": 61.0,
+            "course_name": "WEB DEVELOPMENT FRAMEWORKS"
+          },
+          {
+            "course_code": "MSUD203",
+            "class_type": "LECT",
+            "present": 34,
+            "total": 38,
+            "percentage": 89.0,
+            "course_name": "DISCRETE MATHEMATICS"
+          }
+        ]
+      }
+    },
+    {
+      "image": "B:\\hajri\\hajri-ocr\\imgs\\Screenshot_20251220_150456_Chrome.jpg",
+      "json": {
+        "semester": 3,
+        "attendance": [
+          {
+            "course_code": "CEUC201",
+            "class_type": "LECT",
+            "present": 1,
+            "total": 4,
+            "percentage": 25.0,
+            "course_name": "FUNDAMENTALS OF SOFTWARE EN"
+          },
+          {
+            "course_code": "CEUC202",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 3,
+            "percentage": 0.0,
+            "course_name": "COMPUTER ORGANIZATION AND A"
+          },
+          {
+            "course_code": "CEUP201",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "SOFTWARE GROUP PROJECT"
+          },
+          {
+            "course_code": "HSUV202",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 2,
+            "percentage": 0.0,
+            "course_name": "HUMAN VALUES AND ETHICS"
+          },
+          {
+            "course_code": "ITUC202",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF DATABASE MA"
+          },
+          {
+            "course_code": "ITUC202",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF DATABASE MA"
+          },
+          {
+            "course_code": "ITUE204",
+            "class_type": "LECT",
+            "present": 1,
+            "total": 4,
+            "percentage": 25.0,
+            "course_name": "DESIGN AND ANALYSIS OF ALGORI"
+          },
+          {
+            "course_code": "ITUE204",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "DESIGN AND ANALYSIS OF ALGORI"
+          },
+          {
+            "course_code": "ITUE205",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF INFORMATION"
+          },
+          {
+            "course_code": "ITUE205",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF INFORMATION"
+          }
+        ]
+      }
+    },
+    {
+      "image": "B:\\hajri\\hajri-ocr\\imgs\\Screenshot_20251220_150631_Chrome.jpg",
+      "json": {
+        "semester": 3,
+        "attendance": []
+      }
+    },
+    {
+      "image": "B:\\hajri\\hajri-ocr\\imgs\\Screenshot_20251220_150637_Chrome.jpg",
+      "json": {
+        "semester": 3,
+        "attendance": [
+          {
+            "course_code": "CEUC201",
+            "class_type": "LECT",
+            "present": 2,
+            "total": 4,
+            "percentage": 50.0,
+            "course_name": "FUNDAMENTALS OF SOFTWAREEN"
+          },
+          {
+            "course_code": "CEUC202",
+            "class_type": "LECT",
+            "present": 1,
+            "total": 3,
+            "percentage": 33.3,
+            "course_name": "COMPUTER ORGANIZATION AND AI"
+          },
+          {
+            "course_code": "CEUP201",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "SOFTWARE GROUP PROJECT"
+          },
+          {
+            "course_code": "HSUV202",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "HUMAN VALUES AND ETHICS"
+          },
+          {
+            "course_code": "ITUC202",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF DATABASE MA"
+          },
+          {
+            "course_code": "ITUC202",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 1,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF DATABASE MA"
+          },
+          {
+            "course_code": "ITUE204",
+            "class_type": "LECT",
+            "present": 3,
+            "total": 4,
+            "percentage": 75.0,
+            "course_name": "DESIGN AND ANALYSIS OF ALGORI"
+          },
+          {
+            "course_code": "ITUE204",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "DESIGN AND ANALYSIS OF ALGORI"
+          },
+          {
+            "course_code": "ITUE205",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF INFORMATION"
+          },
+          {
+            "course_code": "ITUE205",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF INFORMATION"
+          }
+        ]
+      }
+    },
+    {
+      "image": "B:\\hajri\\hajri-ocr\\imgs\\Screenshot_20251220_150659_Chrome.jpg",
+      "json": {
+        "semester": 3,
+        "attendance": []
+      }
+    },
+    {
+      "image": "B:\\hajri\\hajri-ocr\\imgs\\Screenshot_20251220_150704_Chrome.jpg",
+      "json": {
+        "semester": 3,
+        "attendance": [
+          {
+            "course_code": "CEUC201",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF SOFTWARE EI"
+          },
+          {
+            "course_code": "CEUC202",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "COMPUTER ORGANIZATION AND A"
+          },
+          {
+            "course_code": "CSUE203",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FOUNDATION OF DATA SCIENCE AI"
+          },
+          {
+            "course_code": "CSUE203",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FOUNDATION OF DATA SCIENCE AI"
+          },
+          {
+            "course_code": "CSUP201",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "SOFTWARE GROUP PROJECTE"
+          },
+          {
+            "course_code": "HSUV202",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "HUMAN VALUES AND ETHICSE"
+          },
+          {
+            "course_code": "ITUC202",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF DATABASE MA"
+          },
+          {
+            "course_code": "ITUC202",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "FUNDAMENTALS OF DATABASE MA"
+          },
+          {
+            "course_code": "ITUE204",
+            "class_type": "LECT",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "DESIGN AND ANALYSIS OF ALGORI"
+          },
+          {
+            "course_code": "ITUE204",
+            "class_type": "LAB",
+            "present": 0,
+            "total": 0,
+            "percentage": 0.0,
+            "course_name": "DESIGN AND ANALYSIS OF ALGORI"
+          }
+        ]
+      }
+    }
+  ]
+}

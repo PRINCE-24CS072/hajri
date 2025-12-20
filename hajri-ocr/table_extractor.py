@@ -1,14 +1,12 @@
 """
-Table extraction using PaddleOCR with coordinate-based parsing and fuzzy matching
+Anchor-Based Table Extraction using PaddleOCR
+Deterministic, rule-based, CPU-only OCR extraction for attendance data
+NO ML training, NO row clustering, ONLY geometry-based anchor matching
 """
 import re
-import json
-from pathlib import Path
-from difflib import SequenceMatcher
 from typing import List, Dict, Optional, Tuple
 import numpy as np
 import cv2
-from PIL import Image as PILImage
 from paddleocr import PaddleOCR
 from models import AttendanceEntry
 import logging
@@ -17,10 +15,16 @@ logger = logging.getLogger(__name__)
 
 
 class TableExtractor:
-    """Extracts attendance data from table images using hybrid approach"""
+    """
+    Anchor-based attendance table extractor
     
-    def __init__(self, use_gpu: bool = False, config: Optional[Dict] = None):
-        """Initialize OCR configuration (lazy loading of OCR engine)"""
+    Core Principle: Rows do NOT exist. Anchors exist.
+    A logical row = (course_code + class_type)
+    All fields attach to anchors via geometry, not OCR rows.
+    """
+    
+    def __init__(self, use_gpu: bool = False, config: Optional[Dict] = None, ocr_engine: Optional[PaddleOCR] = None):
+        """Initialize OCR configuration (lazy loading of OCR engine or reuse provided one)"""
         self.config = {
             'use_angle_cls': False,
             'lang': 'en',
@@ -38,131 +42,559 @@ class TableExtractor:
         if config:
             self.config.update(config)
         
-        self.paddle_ocr = None  # Lazy initialization
+        self.paddle_ocr = ocr_engine  # Use provided engine or lazy initialize later
         
-        # Load course configuration for fuzzy matching
-        self.course_db = self._load_course_config()
-        self.valid_course_codes = list(self.course_db.keys())
-        logger.info(f"Loaded {len(self.valid_course_codes)} course codes for validation")
+        # Column zones (relative to image width)
+        self.COURSE_CODE_ZONE = (0.00, 0.35)
+        self.CLASS_TYPE_ZONE = (0.35, 0.50)
+        self.ATTENDANCE_ZONE = (0.50, 0.75)
+        self.PERCENTAGE_ZONE = (0.75, 1.00)
+        
+        # Matching tolerance (pixels)
+        self.y_tolerance = 20.0  # Vertical distance tolerance for field matching
+        
+        # Right table split threshold
+        self.region_split_threshold = 0.52  # % of image width
+        
+        # Debug storage
+        self.debug_info = {}
+        self.debug_mode = False
+        
+        logger.info("Anchor-based TableExtractor initialized - deterministic geometry matching")
     
-    def _load_course_config(self) -> Dict:
-        """Load course configuration from JSON file"""
-        config_path = Path(__file__).parent / "course_config.json"
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return data.get('courses', {})
-        except FileNotFoundError:
-            logger.warning(f"Course config not found at {config_path}, using empty database")
-            return {}
-        except Exception as e:
-            logger.error(f"Error loading course config: {e}")
-            return {}
+    # ==================== CORE ANCHOR-BASED EXTRACTION ====================
     
-    def _fuzzy_match_course_code(self, ocr_code: str) -> Tuple[Optional[str], float]:
+    def _tokenize_ocr_lines(self, ocr_lines: List) -> Tuple[List[Dict], float]:
         """
-        Find best matching course code using fuzzy string matching.
-        Returns: (matched_code, confidence_score)
+        Convert PaddleOCR raw lines into token dicts with geometric info.
+        Returns: (tokens, image_width)
+        
+        Each token:
+        {
+            'text': str,
+            'conf': float,
+            'x_center': float,
+            'y_center': float,
+            'box': [[x,y], ...]
+        }
         """
-        if not ocr_code or not self.valid_course_codes:
-            return None, 0.0
+        tokens = []
+        max_x = 0.0
         
-        ocr_clean = ocr_code.upper().strip()
-        
-        # Exact match first
-        if ocr_clean in self.valid_course_codes:
-            return ocr_clean, 1.0
-        
-        # Fuzzy match using sequence similarity
-        best_match = None
-        best_score = 0.0
-        
-        for valid_code in self.valid_course_codes:
-            # Calculate similarity ratio
-            ratio = SequenceMatcher(None, ocr_clean, valid_code).ratio()
-            
-            if ratio > best_score:
-                best_score = ratio
-                best_match = valid_code
-        
-        # Only return if confidence is high enough
-        threshold = 0.75  # 75% similarity required
-        if best_score >= threshold:
-            if best_match != ocr_clean:
-                print(f"    🔍 Fuzzy matched '{ocr_clean}' → '{best_match}' (confidence: {best_score:.1%})")
-            return best_match, best_score
-        
-        return None, best_score
+        for line in ocr_lines:
+            box = line[0]
+            text = line[1][0].strip()
+            confidence = line[1][1]
+
+            x_coords = [p[0] for p in box]
+            y_coords = [p[1] for p in box]
+            x_center = sum(x_coords) / 4.0
+            y_center = sum(y_coords) / 4.0
+            max_x = max(max_x, max(x_coords))
+
+            tokens.append({
+                'text': text,
+                'conf': confidence,
+                'x_center': x_center,
+                'y_center': y_center,
+                'box': box
+            })
+
+        return tokens, max_x
     
-    def _sanitize_course_code(self, text: str) -> str:
-        """Sanitize OCR output to fix common errors in course codes"""
-        text = text.upper().strip()
+    def _split_left_right(self, tokens: List[Dict], image_width: float) -> Tuple[List[Dict], List[Dict]]:
+        """
+        Split tokens into left (attendance) and right (dictionary) tables.
+        Uses configurable region_split_threshold.
+        """
+        threshold = image_width * self.region_split_threshold
         
-        # Fix common OCR mistakes
-        # In course codes: I→1, O→0 in digit positions, l→1
-        sanitized = text
+        left = [t for t in tokens if t['x_center'] < threshold]
+        right = [t for t in tokens if t['x_center'] >= threshold]
         
-        # Pattern: XXXX### where X=letter, #=digit
-        # Fix digits that look like letters
-        sanitized = sanitized.replace('O', '0')  # O to zero
-        sanitized = sanitized.replace('o', '0')
-        sanitized = sanitized.replace('l', '1')  # lowercase L to 1
+        # Adaptive fallback if one side empty
+        if (not left or not right) and tokens:
+            xs = sorted(t['x_center'] for t in tokens)
+            threshold = xs[len(xs) // 2]
+            left = [t for t in tokens if t['x_center'] < threshold]
+            right = [t for t in tokens if t['x_center'] >= threshold]
         
-        # Remove common noise characters
-        sanitized = sanitized.replace(' ', '').replace('/', '').replace('-', '')
+        if self.debug_mode:
+            self.debug_info['split_threshold'] = threshold
+            self.debug_info['image_width'] = image_width
         
-        return sanitized
+        return left, right
     
-    def _validate_and_fix_course_code(self, text: str) -> Optional[str]:
-        """Extract and validate course code with intelligent fuzzy matching"""
-        # Expected format: 3-4 letters + 3 digits (CEUC201, ITUE204, ITUC202)
+    def _get_x_ratio(self, x_center: float, image_width: float) -> float:
+        """Get normalized x position (0.0 to 1.0)"""
+        return x_center / image_width if image_width > 0 else 0.0
+    
+    def _in_zone(self, x_ratio: float, zone: Tuple[float, float]) -> bool:
+        """Check if x_ratio is within zone bounds"""
+        return zone[0] <= x_ratio < zone[1]
+    
+    def _detect_anchors(self, left_tokens: List[Dict], image_width: float) -> List[Dict]:
+        """
+        Step 1: Detect anchors (course_code + class_type pairs)
         
-        text_upper = text.upper().strip()
+        An anchor is detected when:
+        - Token matches [A-Z]{3,4}\\d{3} pattern
+        - AND nearby token (same horizontal band) is LECT or LAB
         
-        # Try exact pattern first
-        match = re.search(r'([A-Z]{3,4})(\d{3})', text_upper)
-        if match:
-            prefix = match.group(1)
-            digits = match.group(2)
-            candidate = prefix + digits
+        Returns list of anchors:
+        [{
+            'course_code': str,
+            'class_type': str,
+            'x_center': float,
+            'y_center': float
+        }]
+        """
+        anchors = []
+        
+        # Find all course code candidates
+        course_code_pattern = re.compile(r'[A-Z]{3,4}\d{3}')
+        
+        for token in left_tokens:
+            # Match course code
+            match = course_code_pattern.search(token['text'].upper())
+            if not match:
+                continue
             
-            # Use fuzzy matching against known course codes
-            matched_code, confidence = self._fuzzy_match_course_code(candidate)
-            if matched_code:
-                return matched_code
-        
-        # Try with sanitization
-        sanitized = self._sanitize_course_code(text)
-        match = re.search(r'([A-Z]{3,4})(\d{3})', sanitized)
-        if match:
-            prefix = match.group(1)
-            digits = match.group(2)
-            candidate = prefix + digits
+            course_code = match.group(0)
+            x_ratio = self._get_x_ratio(token['x_center'], image_width)
             
-            # Use fuzzy matching
-            matched_code, confidence = self._fuzzy_match_course_code(candidate)
-            if matched_code:
-                return matched_code
+            # Must be in course code zone
+            if not self._in_zone(x_ratio, self.COURSE_CODE_ZONE):
+                continue
+            
+            # Find nearby class type (LECT or LAB)
+            class_type = None
+            for other in left_tokens:
+                if other is token:
+                    continue
+                
+                # Check Y proximity (same horizontal band)
+                if abs(other['y_center'] - token['y_center']) > self.y_tolerance:
+                    continue
+                
+                # Check if token contains LECT or LAB
+                text_upper = other['text'].upper()
+                if 'LECT' in text_upper:
+                    class_type = 'LECT'
+                    break
+                elif 'LAB' in text_upper:
+                    class_type = 'LAB'
+                    break
+            
+            if class_type:
+                anchors.append({
+                    'course_code': self._normalize_course_code(course_code),
+                    'class_type': class_type,
+                    'x_center': token['x_center'],
+                    'y_center': token['y_center']
+                })
+                logger.info(f"Anchor detected: {course_code} {class_type} at Y={token['y_center']:.1f}")
         
-        # Last resort: try partial matches
-        # Extract any 6-7 character alphanumeric sequence
-        partial = re.search(r'([A-Z]{2,4}\d{2,3})', sanitized)
-        if partial:
-            candidate = partial.group(1)
-            # Pad to 7 chars if needed for fuzzy match
-            if len(candidate) == 6:
-                # Try different padding strategies
-                candidates = [
-                    candidate[0] + candidate,  # Duplicate first letter
-                    'I' + candidate if candidate[0] in 'TUCESM' else candidate,
-                    'C' + candidate if candidate[0] in 'EUV' else candidate
-                ]
-                for cand in candidates:
-                    matched_code, confidence = self._fuzzy_match_course_code(cand)
-                    if matched_code:
-                        return matched_code
+        return anchors
+    
+    def _detect_attendance_fields(self, left_tokens: List[Dict], image_width: float) -> List[Dict]:
+        """
+        Step 2: Detect attendance fields (X/Y pattern)
         
-        return None
+        Returns list of fields:
+        [{
+            'present': int,
+            'total': int,
+            'x_center': float,
+            'y_center': float
+        }]
+        """
+        attendance_pattern = re.compile(r'(\d+)\s*/\s*(\d+)')
+        fields = []
+        
+        for token in left_tokens:
+            # Clean OCR errors (O->0, I/L->1)
+            clean_text = token['text'].upper().replace('O', '0').replace('L', '1').replace('I', '1')
+            
+            match = attendance_pattern.search(clean_text)
+            if not match:
+                continue
+            
+            present = int(match.group(1))
+            total = int(match.group(2))
+            
+            # Sanity check
+            if present > 100 or total > 100:
+                continue
+            
+            x_ratio = self._get_x_ratio(token['x_center'], image_width)
+            
+            # Must be in attendance zone
+            if not self._in_zone(x_ratio, self.ATTENDANCE_ZONE):
+                continue
+            
+            fields.append({
+                'present': present,
+                'total': total,
+                'x_center': token['x_center'],
+                'y_center': token['y_center']
+            })
+        
+        return fields
+    
+    def _detect_percentage_fields(self, left_tokens: List[Dict], image_width: float) -> List[Dict]:
+        """
+        Step 3: Detect percentage fields (X% or X.Y%)
+        
+        Returns list of fields:
+        [{
+            'percentage': float,
+            'x_center': float,
+            'y_center': float
+        }]
+        """
+        percentage_pattern = re.compile(r'(\d+(?:\.\d+)?)\s*%')
+        fields = []
+        
+        for token in left_tokens:
+            match = percentage_pattern.search(token['text'])
+            if not match:
+                continue
+            
+            percentage = float(match.group(1))
+            
+            # Sanity check
+            if percentage > 100:
+                continue
+            
+            x_ratio = self._get_x_ratio(token['x_center'], image_width)
+            
+            # Must be in percentage zone
+            if not self._in_zone(x_ratio, self.PERCENTAGE_ZONE):
+                continue
+            
+            fields.append({
+                'percentage': percentage,
+                'x_center': token['x_center'],
+                'y_center': token['y_center']
+            })
+        
+        return fields
+    
+    def _match_fields_to_anchors(
+        self, 
+        anchors: List[Dict], 
+        attendance_fields: List[Dict], 
+        percentage_fields: List[Dict]
+    ) -> List[Dict]:
+        """
+        Step 4: Match fields to anchors using geometry
+        
+        For each anchor:
+        - Find closest attendance field (in attendance zone, min Y distance)
+        - Find closest percentage field (in percentage zone, min Y distance)
+        
+        Returns entries with attached fields (or None if not found)
+        """
+        entries = []
+        
+        for anchor in anchors:
+            entry = {
+                'course_code': anchor['course_code'],
+                'class_type': anchor['class_type'],
+                'present': None,
+                'total': None,
+                'percentage': None,
+                'y_center': anchor['y_center']
+            }
+            
+            # Find closest attendance field
+            best_attendance = None
+            best_attendance_dist = float('inf')
+            
+            for field in attendance_fields:
+                y_dist = abs(field['y_center'] - anchor['y_center'])
+                if y_dist < self.y_tolerance and y_dist < best_attendance_dist:
+                    best_attendance = field
+                    best_attendance_dist = y_dist
+            
+            if best_attendance:
+                entry['present'] = best_attendance['present']
+                entry['total'] = best_attendance['total']
+            
+            # Find closest percentage field
+            best_percentage = None
+            best_percentage_dist = float('inf')
+            
+            for field in percentage_fields:
+                y_dist = abs(field['y_center'] - anchor['y_center'])
+                if y_dist < self.y_tolerance and y_dist < best_percentage_dist:
+                    best_percentage = field
+                    best_percentage_dist = y_dist
+            
+            if best_percentage:
+                entry['percentage'] = best_percentage['percentage']
+            
+            entries.append(entry)
+        
+        return entries
+    
+    def _normalize_course_code(self, raw_code: str) -> str:
+        """
+        Normalize course code:
+        - Uppercase
+        - Remove non-alphanumeric
+        - Fix OCR confusions (O/D/Q->0, I/L->1)
+        - Format: [A-Z]{3-4}[0-9]{3}
+        """
+        if not raw_code:
+            return ""
+        
+        # Take left of '/' if present
+        left = raw_code.split('/')[0]
+        cleaned = re.sub(r'[^A-Z0-9]', '', left.upper())
+        
+        if not cleaned:
+            return ""
+        
+        # Split letters and tail
+        match = re.match(r'([A-Z]{2,5})([A-Z0-9]*)', cleaned)
+        if not match:
+            return cleaned[:7]
+        
+        letters, tail = match.group(1), match.group(2)
+        
+        # Fix numeric tail
+        tail_fixed = []
+        for ch in tail:
+            if ch.isdigit():
+                tail_fixed.append(ch)
+            else:
+                # OCR confusion fixes
+                mapped = {'O': '0', 'D': '0', 'Q': '0', 'I': '1', 'L': '1'}
+                tail_fixed.append(mapped.get(ch, ch))
+        
+        # Extract digits (expecting 3)
+        digits_only = ''.join([c for c in tail_fixed if c.isdigit()])
+        if digits_only:
+            digit_part = (digits_only + '000')[:3]
+        else:
+            digit_part = '000'
+        
+        normalized = (letters[:4] + digit_part).strip()
+        return normalized
+    
+    def _build_course_dictionary(self, right_tokens: List[Dict]) -> Dict[str, str]:
+        """
+        Step 5: Build course code -> course name dictionary from RIGHT table
+        
+        Strategy:
+        - Cluster tokens by Y proximity (rows)
+        - Find course code in each row
+        - Find longest text as course name
+        - Build mapping
+        
+        Returns: {course_code: course_name}
+        """
+        course_dict = {}
+        
+        # Simple row clustering by Y
+        rows = self._cluster_tokens_by_y(right_tokens)
+        
+        for row in rows:
+            # Skip header rows
+            header_text = " ".join(t['text'].upper() for t in row)
+            if 'COURSE CODE' in header_text or 'COURSE NAME' in header_text:
+                continue
+            
+            # Find course code
+            course_code = None
+            for token in row:
+                match = re.search(r'[A-Z]{3,4}\d{3}', token['text'].upper())
+                if match:
+                    course_code = self._normalize_course_code(match.group(0))
+                    if course_code:
+                        break
+            
+            if not course_code:
+                continue
+            
+            # Find course name (longest text > 8 chars)
+            name_candidates = [
+                t['text'].strip().upper()
+                for t in row
+                if len(t['text'].strip()) > 8
+            ]
+            
+            if not name_candidates:
+                continue
+            
+            course_name = max(name_candidates, key=len)
+            course_dict[course_code] = course_name
+            logger.info(f"Dictionary: {course_code} -> {course_name}")
+        
+        return course_dict
+    
+    def _cluster_tokens_by_y(self, tokens: List[Dict], tolerance: float = 20.0) -> List[List[Dict]]:
+        """
+        Cluster tokens into rows by Y proximity.
+        Returns sorted list of rows (each row sorted left-to-right).
+        """
+        rows_dict: Dict[float, List[Dict]] = {}
+        
+        for token in tokens:
+            matched_y = None
+            for y in rows_dict.keys():
+                if abs(token['y_center'] - y) <= tolerance:
+                    matched_y = y
+                    break
+            
+            if matched_y is None:
+                matched_y = token['y_center']
+                rows_dict[matched_y] = []
+            
+            rows_dict[matched_y].append(token)
+        
+        # Sort rows by Y, and tokens within each row by X
+        rows = []
+        for y in sorted(rows_dict.keys()):
+            row = sorted(rows_dict[y], key=lambda t: t['x_center'])
+            rows.append(row)
+        
+        return rows
+    
+    def _inject_course_names(self, entries: List[Dict], course_dict: Dict[str, str]) -> List[Dict]:
+        """
+        Step 6: Inject course names from dictionary
+        
+        Sets course_name to:
+        - Dictionary value if found
+        - "UNKNOWN" if not found
+        
+        Logs warnings for missing codes.
+        """
+        for entry in entries:
+            course_code = entry['course_code']
+            
+            if course_code in course_dict:
+                entry['course_name'] = course_dict[course_code]
+            else:
+                entry['course_name'] = 'UNKNOWN'
+                logger.warning(f"Dictionary miss: {course_code} (row kept as UNKNOWN)")
+        
+        return entries
+    
+    def _validate_entries(self, entries: List[Dict]) -> List[Dict]:
+        """
+        Step 7: Apply validation rules
+        
+        Rules:
+        1. present <= total
+        2. percentage ≈ present/total (±3%)
+        3. LAB and LECT remain separate
+        4. Duplicate anchors merged deterministically
+        5. Invalid rows flagged (not dropped)
+        
+        Computes percentage if missing.
+        """
+        validated = []
+        
+        for entry in entries:
+            present = entry.get('present', 0)
+            total = entry.get('total', 0)
+            percentage = entry.get('percentage')
+            
+            # Compute percentage if missing
+            if percentage is None:
+                if total > 0:
+                    percentage = round((present / total) * 100, 1)
+                else:
+                    percentage = 0.0
+            
+            entry['percentage'] = percentage
+            
+            # Validation checks (log warnings, don't drop)
+            if present is None or total is None:
+                logger.warning(f"Missing attendance for {entry['course_code']} {entry['class_type']}")
+                entry['present'] = 0
+                entry['total'] = 0
+            
+            if present > total and total > 0:
+                logger.warning(f"Invalid: present > total for {entry['course_code']} {entry['class_type']}: {present}/{total}")
+            
+            if total > 0:
+                expected_pct = (present / total) * 100
+                if abs(percentage - expected_pct) > 3.0:
+                    logger.warning(f"Percentage mismatch for {entry['course_code']} {entry['class_type']}: {percentage}% vs expected {expected_pct:.1f}%")
+            
+            validated.append(entry)
+        
+        return validated
+    
+    def _deduplicate_anchors(self, entries: List[Dict]) -> List[Dict]:
+        """
+        Step 8: Deduplicate entries by anchor key (course_code, class_type)
+        
+        If duplicates exist, merge deterministically:
+        - Choose entry with non-zero total
+        - If tie, choose entry with higher Y (later in page)
+        """
+        anchor_map = {}  # (course_code, class_type) -> entry
+        
+        for entry in entries:
+            key = (entry['course_code'], entry['class_type'])
+            
+            if key not in anchor_map:
+                anchor_map[key] = entry
+            else:
+                existing = anchor_map[key]
+                
+                # Prefer non-zero total
+                if entry.get('total', 0) > 0 and existing.get('total', 0) == 0:
+                    anchor_map[key] = entry
+                    logger.info(f"Duplicate resolved: {key} - chose entry with total={entry['total']}")
+                elif entry.get('total', 0) == existing.get('total', 0):
+                    # Prefer later Y position
+                    if entry.get('y_center', 0) > existing.get('y_center', 0):
+                        anchor_map[key] = entry
+                        logger.info(f"Duplicate resolved: {key} - chose later Y position")
+        
+        return list(anchor_map.values())
+    
+    def _build_final_entries(self, entries: List[Dict]) -> List[AttendanceEntry]:
+        """
+        Step 9: Convert to AttendanceEntry objects and sort
+        
+        Sort order:
+        1. course_code (ascending)
+        2. LECT before LAB
+        """
+        type_order = {'LECT': 0, 'LAB': 1}
+        
+        sorted_entries = sorted(
+            entries, 
+            key=lambda x: (x['course_code'], type_order.get(x['class_type'], 2))
+        )
+        
+        final_entries = []
+        for entry in sorted_entries:
+            try:
+                attendance = AttendanceEntry(
+                    course_code=entry['course_code'],
+                    course_name=entry.get('course_name', 'UNKNOWN'),
+                    class_type=entry['class_type'],
+                    present=entry.get('present', 0),
+                    total=entry.get('total', 0),
+                    percentage=entry.get('percentage', 0.0),
+                    confidence=0.95  # Anchor-based extraction is highly confident
+                )
+                final_entries.append(attendance)
+            except Exception as e:
+                logger.error(f"Failed to create AttendanceEntry: {e} - Entry: {entry}")
+        
+        return final_entries
+    
+    # ==================== MAIN EXTRACTION PIPELINE ====================
     
     def _get_ocr(self):
         """Lazy initialize PaddleOCR on first use"""
@@ -172,285 +604,121 @@ class TableExtractor:
             print("✓ PaddleOCR ready")
         return self.paddle_ocr
     
-    def extract_table_data(self, image: np.ndarray) -> List[AttendanceEntry]:
-        """Extract attendance entries directly from image"""
-        # Skip img2table - coordinate-based extraction works better for this dashboard
-        logger.info("Using coordinate-based extraction with enhanced preprocessing")
-        return self._coordinate_based_extraction(image)
-    
-    def _parse_structured_table(self, table_content: List[List]) -> List[AttendanceEntry]:
-        """Parse img2table output into AttendanceEntry objects"""
-        entries = []
+    def extract_table_data(self, image: np.ndarray, debug: bool = False) -> List[AttendanceEntry]:
+        """
+        Main anchor-based extraction pipeline
         
-        # Skip header row
-        data_rows = table_content[1:] if len(table_content) > 1 else table_content
+        Steps:
+        1. Run OCR → get tokens
+        2. Split left (attendance) vs right (dictionary)
+        3. Detect anchors (course_code + class_type pairs)
+        4. Detect attendance fields (X/Y)
+        5. Detect percentage fields (X%)
+        6. Match fields to anchors (geometry-based)
+        7. Build course dictionary from right table
+        8. Inject course names
+        9. Validate and deduplicate
+        10. Return final entries
+        """
+        self.debug_mode = debug
+        self.debug_info = {}
         
-        for row in data_rows:
-            try:
-                # Convert None to empty string
-                row_clean = [str(cell) if cell is not None else "" for cell in row]
-                row_text = " ".join(row_clean)
-                
-                # Extract course code
-                course_code_match = re.search(r'\b([A-Z]{3,4}\d{2,3})\b', row_text)
-                if not course_code_match:
-                    continue
-                course_code = course_code_match.group(1)
-                
-                # Extract attendance numbers
-                attendance_match = re.search(r'(\d+)\s*/\s*(\d+)', row_text.replace('o', '0').replace('O', '0'))
-                if not attendance_match:
-                    continue
-                present = int(attendance_match.group(1))
-                total = int(attendance_match.group(2))
-                
-                # Extract class type
-                class_type = "LAB" if "LAB" in row_text.upper() else "LECT"
-                
-                # Find long course name
-                course_name = None
-                for cell in row_clean:
-                    if len(cell) > 15 and cell.isupper():
-                        course_name = cell
-                        break
-                
-                if not course_name:
-                    # Look for abbreviated name after slash
-                    abbr_match = re.search(r'/\s*([A-Z]{2,10})', row_text)
-                    course_name = abbr_match.group(1) if abbr_match else "UNKNOWN"
-                
-                percentage = round((present / total * 100), 1) if total > 0 else 0.0
-                
-                entries.append(AttendanceEntry(
-                    course_code=course_code,
-                    course_name=course_name,
-                    class_type=class_type,
-                    present=present,
-                    total=total,
-                    percentage=percentage,
-                    confidence=0.85
-                ))
-                
-                logger.info(f"✓ Parsed: {course_code} | {class_type} | {present}/{total} | {course_name}")
-                
-            except Exception as e:
-                logger.warning(f"Failed to parse row: {e}")
-                continue
-        
-        return entries
-    
-    def _coordinate_based_extraction(self, image: np.ndarray) -> List[AttendanceEntry]:
-        """Fallback: Extract using coordinate analysis"""
         try:
-            # Debug: Save preprocessed image for analysis
-            cv2.imwrite('debug_preprocessed.png', image)
-            print(f"💾 Saved debug_preprocessed.png (shape: {image.shape})")
-            print(f"📊 Image stats: min={image.min()}, max={image.max()}, mean={image.mean():.1f}")
-            
+            # Step 1: Run OCR
+            print("\n[*] Step 1: Running OCR...")
             result = self._get_ocr().ocr(image, cls=True)
             
             if not result or not result[0]:
+                print("[FAIL] No OCR results")
                 return []
             
-            # Build text boxes with coordinates
-            text_boxes = []
-            for line in result[0]:
-                box = line[0]
-                text = line[1][0].strip()
-                confidence = line[1][1]
-                
-                y_mid = (box[0][1] + box[2][1]) / 2
-                x_mid = (box[0][0] + box[1][0]) / 2
-                
-                text_boxes.append({
-                    'text': text,
-                    'conf': confidence,
-                    'y': y_mid,
-                    'x': x_mid
-                })
+            # Step 2: Tokenize
+            print("📍 Step 2: Tokenizing...")
+            tokens, image_width = self._tokenize_ocr_lines(result[0])
+            print(f"   Found {len(tokens)} tokens, image width: {image_width:.0f}px")
             
-            logger.info(f"OCR detected {len(text_boxes)} text boxes")
+            # Step 3: Split left/right
+            print("✂️  Step 3: Splitting left/right tables...")
+            left_tokens, right_tokens = self._split_left_right(tokens, image_width)
+            print(f"   Left: {len(left_tokens)} tokens, Right: {len(right_tokens)} tokens")
             
-            # Log first 10 text boxes for debugging
-            for i, box in enumerate(text_boxes[:10]):
-                logger.debug(f"Box {i}: '{box['text']}' at ({box['x']:.0f}, {box['y']:.0f})")
+            if self.debug_mode:
+                self.debug_info['all_tokens'] = tokens
+                self.debug_info['left_tokens'] = left_tokens
+                self.debug_info['right_tokens'] = right_tokens
             
-            logger.info(f"OCR detected {len(text_boxes)} text boxes")
-            print(f"🔍 OCR detected {len(text_boxes)} text boxes")
+            # Step 4: Detect anchors
+            print("⚓ Step 4: Detecting anchors...")
+            anchors = self._detect_anchors(left_tokens, image_width)
+            print(f"   Found {len(anchors)} anchors")
             
-            # Log first 10 text boxes for debugging
-            for i, box in enumerate(text_boxes[:10]):
-                logger.info(f"Box {i}: '{box['text']}' at ({box['x']:.0f}, {box['y']:.0f})")
-                print(f"📦 Box {i}: '{box['text']}' at ({box['x']:.0f}, {box['y']:.0f})")
+            if not anchors:
+                print("❌ No anchors detected")
+                return []
             
-            # Group into rows (tighter tolerance for better separation)
-            rows_dict = {}
-            avg_height = 30  # Approximate
-            tolerance = 12  # Reduced from 25 for better row separation
+            if self.debug_mode:
+                self.debug_info['anchors'] = anchors
             
-            for box in text_boxes:
-                # Skip headers
-                if any(word in box['text'].upper() for word in ['COURSE', 'CLASS', 'TYPE', 'PRESENT', 'TOTAL']):
-                    continue
-                if len(box['text']) < 2:
-                    continue
-                
-                # Find or create row
-                matched_y = None
-                for y in rows_dict.keys():
-                    if abs(box['y'] - y) <= tolerance:
-                        matched_y = y
-                        break
-                
-                if matched_y is None:
-                    matched_y = box['y']
-                    rows_dict[matched_y] = []
-                
-                rows_dict[matched_y].append(box)
+            # Step 5: Detect attendance fields
+            print("📊 Step 5: Detecting attendance fields...")
+            attendance_fields = self._detect_attendance_fields(left_tokens, image_width)
+            print(f"   Found {len(attendance_fields)} attendance fields")
             
-            # Parse each row
-            entries = []
-            logger.info(f"Found {len(rows_dict)} potential rows to parse")
-            print(f"📊 Found {len(rows_dict)} potential rows to parse")
+            if self.debug_mode:
+                self.debug_info['attendance_fields'] = attendance_fields
             
-            for y in sorted(rows_dict.keys()):
-                row_boxes = sorted(rows_dict[y], key=lambda b: b['x'])
-                row_text = " | ".join([b['text'] for b in row_boxes])
-                logger.info(f"Parsing row at y={y}: {row_text}")
-                print(f"🔄 Parsing row: {row_text}")
-                
-                entry = self._parse_coordinate_row(row_boxes)
-                if entry:
-                    entries.append(entry)
-                    print(f"✅ Row ACCEPTED")
-                else:
-                    logger.info(f"Row rejected (no course code or attendance found)")
-                    print(f"❌ Row REJECTED")
+            # Step 6: Detect percentage fields
+            print("📈 Step 6: Detecting percentage fields...")
+            percentage_fields = self._detect_percentage_fields(left_tokens, image_width)
+            print(f"   Found {len(percentage_fields)} percentage fields")
             
-            logger.info(f"Successfully extracted {len(entries)} attendance entries")
-            print(f"🎯 Final result: {len(entries)} entries extracted")
-            return entries
+            if self.debug_mode:
+                self.debug_info['percentage_fields'] = percentage_fields
+            
+            # Step 7: Match fields to anchors
+            print("🔗 Step 7: Matching fields to anchors...")
+            entries = self._match_fields_to_anchors(anchors, attendance_fields, percentage_fields)
+            print(f"   Created {len(entries)} entries")
+            
+            # Step 8: Build course dictionary
+            print("📚 Step 8: Building course dictionary...")
+            course_dict = self._build_course_dictionary(right_tokens)
+            print(f"   Dictionary size: {len(course_dict)}")
+            
+            if self.debug_mode:
+                self.debug_info['course_dict'] = course_dict
+            
+            # Step 9: Inject course names
+            print("🏷️  Step 9: Injecting course names...")
+            entries = self._inject_course_names(entries, course_dict)
+            
+            # Step 10: Validate
+            print("[*] Step 10: Validating entries...")
+            entries = self._validate_entries(entries)
+            
+            # Step 11: Deduplicate
+            print("🗑️  Step 11: Deduplicating anchors...")
+            entries = self._deduplicate_anchors(entries)
+            print(f"   {len(entries)} unique entries")
+            
+            # Step 12: Build final output
+            print("🎯 Step 12: Building final output...")
+            final = self._build_final_entries(entries)
+            print(f"[OK] Extracted {len(final)} attendance entries\n")
+            
+            if self.debug_mode:
+                self.debug_info['final_entries'] = [e.dict() for e in final]
+            
+            return final
             
         except Exception as e:
-            logger.error(f"Coordinate extraction failed: {e}")
+            logger.error(f"Extraction failed: {e}", exc_info=True)
+            print(f"[FAIL] Error: {e}")
             return []
     
-    def _parse_coordinate_row(self, boxes: List[dict]) -> Optional[AttendanceEntry]:
-        """
-        Smart parsing algorithm for attendance table rows.
-        Handles: Same course appearing multiple times (LECT + LAB with different attendance)
-        Table structure: Course | Class Type | Present/Total | Percentage | Course Code | Course Name
-        """
-        if len(boxes) < 3:
-            print(f"  ⚠️ Row has only {len(boxes)} cells, need at least 3")
-            return None
-        
-        # Sort boxes left-to-right for column identification
-        sorted_boxes = sorted(boxes, key=lambda b: b['x'])
-        all_text = " ".join([b['text'] for b in boxes])
-        print(f"  📝 Row text: {all_text}")
-        
-        # === STEP 1: Extract Course Code (most reliable identifier) ===
-        # Strategy: Look in right half (Course Code column is on right side)
-        mid_point = len(sorted_boxes) // 2
-        right_boxes = sorted_boxes[mid_point:]
-        
-        course_code = None
-        # First pass: Try to extract from right-side boxes (Course Code column)
-        for box in right_boxes:
-            validated = self._validate_and_fix_course_code(box['text'])
-            if validated:
-                course_code = validated
-                print(f"  ✓ Course code (right): {course_code}")
-                break
-        
-        # Second pass: Try left-side boxes if needed
-        if not course_code:
-            for box in sorted_boxes[:mid_point]:
-                validated = self._validate_and_fix_course_code(box['text'])
-                if validated:
-                    course_code = validated
-                    print(f"  ✓ Course code (left): {course_code}")
-                    break
-        
-        # Final fallback: search all text
-        if not course_code:
-            validated = self._validate_and_fix_course_code(all_text)
-            if validated:
-                course_code = validated
-                print(f"  ✓ Course code (fallback): {course_code}")
-        
-        if not course_code:
-            print(f"  ❌ No valid course code found in: {all_text}")
-            return None
-        
-        # === STEP 2: Extract Class Type (LECT or LAB) - Critical for duplicates! ===
-        class_type = "LECT"  # Default
-        for box in sorted_boxes:
-            text_upper = box['text'].upper()
-            if "LAB" in text_upper:
-                class_type = "LAB"
-                print(f"  ✓ Class type: LAB")
-                break
-            elif "LECT" in text_upper:
-                class_type = "LECT"
-                print(f"  ✓ Class type: LECT")
-                break
-        
-        # === STEP 3: Extract Attendance (Present/Total) ===
-        # Clean OCR errors: o→0, O→0, l→1, I→1, S→5, s→5
-        clean_text = all_text.replace('o', '0').replace('O', '0').replace('l', '1').replace('I', '1')
-        clean_text = clean_text.replace('S', '5').replace('s', '5').replace('B', '8')
-        
-        # Find attendance pattern
-        attendance_match = re.search(r'(\d+)\s*/\s*(\d+)', clean_text)
-        
-        if not attendance_match:
-            return None
-        
-        present = int(attendance_match.group(1))
-        total = int(attendance_match.group(2))
-        
-        # === STEP 4: Extract Course Name ===
-        # First try: Get from course database (most reliable)
-        if course_code in self.course_db:
-            course_name = self.course_db[course_code]['name']
-            print(f"  ✓ Course name (database): {course_name}")
-        else:
-            # Fallback: Look for long uppercase text (likely full course name)
-            course_name = None
-            for box in right_boxes:  # Prioritize right side
-                if len(box['text']) > 15:  # Long text = full name
-                    # Clean up the course name
-                    cleaned_name = box['text'].strip().upper()
-                    # Fix common OCR mixed-case errors
-                    cleaned_name = cleaned_name.replace('i', 'I').replace('o', 'O')
-                    course_name = cleaned_name
-                    print(f"  ✓ Course name (OCR): {course_name}")
-                    break
-            
-            # Last resort: use abbreviation from "Course" column
-            if not course_name:
-                abbr_match = re.search(r'/\s*([A-Z]{2,10})', all_text.upper())
-                course_name = abbr_match.group(1) if abbr_match else "UNKNOWN"
-                print(f"  ✓ Course name (abbr): {course_name}")
-        
-        percentage = round((present / total * 100), 1) if total > 0 else 0.0
-        
-        logger.info(f"✓ Extracted: {course_code} | {class_type} | {present}/{total} ({percentage}%) | {course_name}")
-
-        
-        return AttendanceEntry(
-            course_code=course_code,
-            course_name=course_name,
-            class_type=class_type,
-            present=present,
-            total=total,
-            percentage=percentage,
-            confidence=0.80
-        )
-    
     def update_config(self, config: Dict):
-        """Update OCR configuration"""
+        """Update OCR configuration and reset engine"""
         self.config.update(config)
         self.paddle_ocr = None  # Reset for lazy reload
+        logger.info(f"OCR config updated: {config}")
+
