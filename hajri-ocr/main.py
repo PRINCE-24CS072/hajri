@@ -78,7 +78,7 @@ async def extract_attendance(file: UploadFile = File(...)):
         image_bytes = await file.read()
         size_mb = len(image_bytes) / (1024 * 1024)
         
-        if size_mb > settings.max_file_size_mb:
+        if size_mb > settings.max_image_size_mb:
             raise HTTPException(400, f"File too large: {size_mb:.2f}MB")
         
         # Preprocess image (preserves table lines)

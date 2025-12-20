@@ -1,4 +1,4 @@
-# Production dependencies - Only what we actually use
+# Production dependencies - Python 3.11 compatible
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 python-multipart==0.0.19
