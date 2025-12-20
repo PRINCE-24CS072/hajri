@@ -1,0 +1,65 @@
+[
+  {
+    "course_code": "CEUC201",
+    "course_name": "FUNDAMENTALS OF SOFTWARE ENGINEERING",
+    "class_type": "LECT",
+    "present": 0,
+    "total": 0,
+    "percentage": 0.0,
+    "confidence": 0.95
+  },
+  {
+    "course_code": "CEUC202",
+    "course_name": "COMPUTER ORGANIZATION AND ARCHITECTURE",
+    "class_type": "LECT",
+    "present": 0,
+    "total": 0,
+    "percentage": 0.0,
+    "confidence": 0.95
+  },
+  {
+    "course_code": "ITUC202",
+    "course_name": "FUNDAMENTALS OF DATABASE MANAGEMENT SYSTEMS",
+    "class_type": "LECT",
+    "present": 0,
+    "total": 0,
+    "percentage": 0.0,
+    "confidence": 0.95
+  },
+  {
+    "course_code": "ITUE204",
+    "course_name": "DESIGN AND ANALYSIS OF ALGORITHMS",
+    "class_type": "LECT",
+    "present": 0,
+    "total": 0,
+    "percentage": 0.0,
+    "confidence": 0.95
+  },
+  {
+    "course_code": "ITUE204",
+    "course_name": "DESIGN AND ANALYSIS OF ALGORITHMS",
+    "class_type": "LAB",
+    "present": 0,
+    "total": 0,
+    "percentage": 0.0,
+    "confidence": 0.95
+  },
+  {
+    "course_code": "ITUE205",
+    "course_name": "FUNDAMENTALS OF INFORMATION SECURITY",
+    "class_type": "LECT",
+    "present": 0,
+    "total": 0,
+    "percentage": 0.0,
+    "confidence": 0.95
+  },
+  {
+    "course_code": "ITUE205",
+    "course_name": "FUNDAMENTALS OF INFORMATION SECURITY",
+    "class_type": "LAB",
+    "present": 0,
+    "total": 0,
+    "percentage": 0.0,
+    "confidence": 0.95
+  }
+]

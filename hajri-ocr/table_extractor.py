@@ -506,7 +506,7 @@ class TableExtractor:
             
             # Compute percentage if missing
             if percentage is None:
-                if total > 0:
+                if total and total > 0:
                     percentage = round((present / total) * 100, 1)
                 else:
                     percentage = 0.0
@@ -516,10 +516,12 @@ class TableExtractor:
             # Validation checks (log warnings, don't drop)
             if present is None or total is None:
                 logger.warning(f"Missing attendance for {entry['course_code']} {entry['class_type']}")
-                entry['present'] = 0
-                entry['total'] = 0
+                entry['present'] = entry['present'] if entry.get('present') is not None else 0
+                entry['total'] = entry['total'] if entry.get('total') is not None else 0
+                present = entry['present']
+                total = entry['total']
             
-            if present > total and total > 0:
+            if present and total and present > total and total > 0:
                 logger.warning(f"Invalid: present > total for {entry['course_code']} {entry['class_type']}: {present}/{total}")
             
             if total > 0:
