@@ -4,6 +4,7 @@ uvicorn[standard]==0.34.0
 python-multipart==0.0.19
 paddleocr==2.7.3
 paddlepaddle==3.0.0
+setuptools>=65.0.0
 opencv-python-headless==4.10.0.84
 Pillow==11.0.0
 numpy==1.26.4
