@@ -23,6 +23,7 @@
             --pad-1: 8px;
             --pad-2: 10px;
             --pad-3: 12px;
+            --dtTopH: 44px;
         }
 
         * { box-sizing: border-box; }
@@ -203,6 +204,11 @@
         details.dt-details > summary::-webkit-details-marker { display: none; }
         details.dt-details[open] > summary { margin-bottom: 8px; }
 
+        /* Mobile-friendly accordion sections in sidebar */
+        details.dt-acc > summary { cursor: pointer; list-style: none; outline: none; }
+        details.dt-acc > summary::-webkit-details-marker { display: none; }
+        details.dt-acc[open] > summary { margin-bottom: 8px; }
+
         .kv {
             display: grid;
             grid-template-columns: 120px 1fr;
@@ -353,6 +359,11 @@
         th { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.06); position: sticky; top: 0; }
         tr:hover td { background: rgba(255,255,255,0.05); }
 
+        /* Entries table: widen course_name column (keeps text readable; horizontal scroll if needed) */
+        table.entriesTable { min-width: 920px; }
+        table.entriesTable th:nth-child(3),
+        table.entriesTable td:nth-child(3) { min-width: 360px; }
+
         .thumbs {
             display: grid;
             grid-template-columns: repeat(auto-fill, 160px);
@@ -472,6 +483,17 @@
             min-width: 0;
         }
 
+        .env-banner {
+            display: none;
+            border-bottom: 1px solid var(--border);
+            background: rgba(239, 68, 68, 0.10);
+            color: rgba(255,255,255,0.92);
+            padding: 10px 12px;
+            font-size: 12px;
+            line-height: 1.35;
+        }
+        .env-banner .mono { font-family: var(--mono); }
+
         .dt-brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
         .dt-title { font-weight: 900; font-size: 13px; letter-spacing: 0.02em; white-space: nowrap; }
         .dt-sub {
@@ -484,6 +506,9 @@
         }
 
         .dt-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+        .dt-chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
+        .dt-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
 
         .dt-main {
             flex: 1 1 auto;
@@ -565,14 +590,123 @@
         pre { max-width: 100%; }
         .md-render { max-width: 100%; overflow: auto; }
 
+        :root { --dtDockH: 0px; }
+
         @media (max-width: 980px) {
+            /* Mobile/tablet UX: prefer a single scroll container */
+            body { overflow: auto; }
+            .devtools { height: auto; min-height: 100vh; }
+            .dt-main { grid-template-columns: 1fr; min-height: auto; }
+            .dt-side { border-right: 0; border-bottom: 1px solid var(--border); overflow: visible; }
+            .dt-content { min-height: auto; }
+            .dt-panels { overflow: visible; min-height: auto; }
+
+            /* Keep content above the floating dock */
+            .dt-side { padding-bottom: calc(var(--dtDockH) + 10px); }
+            .dt-panels { padding-bottom: calc(var(--dtDockH) + 12px); }
+
+            /* Keep controls reachable while scrolling */
+            .dt-top { position: sticky; top: 0; z-index: 30; }
+            .env-banner { position: sticky; top: var(--dtTopH); z-index: 29; }
+            .dt-tabs { position: sticky; top: calc(var(--dtTopH) + 1px); z-index: 28; }
+
+            /* Make top bar wrap cleanly instead of cramping */
+            .dt-top {
+                height: auto;
+                padding: 10px 12px;
+                align-items: flex-start;
+            }
+            .dt-right { width: 100%; justify-content: flex-start; }
+
+            /* Top header should be compact; actions move to floating dock */
+            .dt-brand { width: 100%; }
+            .dt-title { font-size: 12px; }
+            .dt-sub { display: none; }
+
+            /* Chips: swipe horizontally, Actions: big 2-column buttons */
+            .dt-chips {
+                width: 100%;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                overflow-y: hidden;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: 4px;
+                justify-content: flex-start;
+            }
+            .dt-chips .chip { font-size: 11px; padding: 5px 8px; }
+
+            /* Floating action dock */
+            .dt-actions {
+                position: fixed;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                z-index: 40;
+                width: 100%;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+                padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+                background: rgba(23, 27, 33, 0.92);
+                border-top: 1px solid rgba(255,255,255,0.12);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                box-shadow: 0 -18px 50px rgba(0,0,0,0.55);
+            }
+            .dt-actions .btn { width: 100%; min-height: 44px; }
+            .dt-actions #btnRun { grid-column: 1 / -1; }
+
+            /* Tabs should be easy to swipe on mobile */
+            .dt-tabs {
+                height: auto;
+                padding: 8px 12px;
+                overflow-x: auto;
+                overflow-y: hidden;
+                -webkit-overflow-scrolling: touch;
+                flex-wrap: nowrap;
+            }
+            .dt-tab { white-space: nowrap; }
+
+            /* Bigger touch targets */
+            .btn { min-height: 40px; padding: 10px 12px; }
+            .dt-tab { padding: 10px 12px; }
+            .input { min-height: 40px; padding: 10px 10px; }
+            .drop { padding: 14px; }
+            .dt-block { padding: 12px; }
+
+            /* Give sidebar blocks a clearer "section" feel */
+            .dt-side { counter-reset: sec; }
+            .dt-side .dt-block-title::before {
+                counter-increment: sec;
+                content: counter(sec) " — ";
+                color: rgba(138, 180, 248, 0.95);
+            }
+
+            /* Courses: make action row feel like a real mobile form */
+            .course-edit-actions {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+                align-items: stretch;
+            }
+            .course-edit-actions .btn { width: 100%; }
+            #btnCourseRefresh { grid-column: 1 / -1; }
+            #courseStatus { grid-column: 1 / -1; margin-left: 0 !important; }
+
+            /* Course table actions: stack buttons on narrow screens */
+            .course-actions { flex-direction: column; align-items: stretch; }
+            .course-actions .btn.small { width: 100%; }
+
             .dt-main { grid-template-columns: 1fr; }
-            .dt-side { border-right: 0; border-bottom: 1px solid var(--border); }
             .dt-sub { max-width: 70vw; }
         }
 
         @media (max-width: 420px) {
-            .dt-sub { display: none; }
+            /* Reduce chip clutter on very small screens */
+            #chipEndpoint { display: none; }
+
+            #chipTiming { display: none; }
+            #btnCopyCurl { display: none; }
         }
     </style>
 </head>
@@ -584,19 +718,25 @@
                 <div class="dt-sub">Upload → POST /ocr/debug → inspect entries, markdown, request/response</div>
             </div>
             <div class="dt-right">
-                <span class="chip mono" id="chipEndpoint">POST /ocr/debug</span>
-                <span class="chip" id="chipStatus">Idle</span>
-                <span class="chip mono" id="chipTiming">— ms</span>
-                <span class="chip mono" id="chipSession">session: …</span>
-                <button class="btn" id="btnLogout" type="button">Logout</button>
-                <button class="btn" id="btnCopyCurl" type="button">Copy cURL</button>
-                <button class="btn primary" id="btnRun" type="button" disabled>Run</button>
+                <div class="dt-chips">
+                    <span class="chip mono" id="chipEndpoint">POST /ocr/debug</span>
+                    <span class="chip" id="chipStatus">Idle</span>
+                    <span class="chip mono" id="chipTiming">— ms</span>
+                    <span class="chip mono" id="chipSession">session: …</span>
+                </div>
+                <div class="dt-actions">
+                    <button class="btn" id="btnLogout" type="button">Logout</button>
+                    <button class="btn" id="btnCopyCurl" type="button">Copy cURL</button>
+                    <button class="btn primary" id="btnRun" type="button" disabled>Run</button>
+                </div>
             </div>
         </div>
 
+        <div class="env-banner" id="envBanner"></div>
+
         <div class="dt-main">
             <aside class="dt-side">
-                <div class="dt-block">
+                <div class="dt-block" id="blockUpload">
                     <div class="dt-block-title">Upload</div>
                     <div class="drop" id="dropZone">
                         <div style="font-weight:900;">Drop image here or click</div>
@@ -608,7 +748,7 @@
                     </div>
                 </div>
 
-                <div class="dt-block">
+                <div class="dt-block" id="blockFile">
                     <div class="dt-block-title">File</div>
                     <div class="kv mono">
                         <div class="k">Name</div><div class="v" id="mFile">—</div>
@@ -639,8 +779,8 @@
                     </details>
                 </div>
 
-                <div class="dt-block">
-                    <div class="dt-block-title">Course Mapping</div>
+                <details class="dt-block dt-acc" id="blockCourses" open>
+                    <summary class="dt-block-title">Course Mapping</summary>
                     <div class="hint">Add / edit / remove courses (writes to <span class="mono">course_config.json</span>). Requires admin session.</div>
 
                     <div class="mini-grid" style="margin-top:10px;">
@@ -654,7 +794,7 @@
                         <input class="input" id="courseName" placeholder="FUNDAMENTALS OF SOFTWARE ENGINEERING" />
                     </div>
 
-                    <div class="row" style="margin-top:10px;">
+                    <div class="row course-edit-actions" style="margin-top:10px;">
                         <button class="btn primary" id="btnCourseSave" type="button">Save</button>
                         <button class="btn" id="btnCourseClear" type="button">Clear</button>
                         <button class="btn" id="btnCourseRefresh" type="button">Refresh</button>
@@ -676,10 +816,10 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </details>
 
-                <div class="dt-block" style="border-bottom:0;">
-                    <div class="dt-block-title">Run</div>
+                <details class="dt-block dt-acc" id="blockRun" style="border-bottom:0;" open>
+                    <summary class="dt-block-title">Run</summary>
                     <div class="kv">
                         <div class="k">HTTP</div><div class="v mono" id="mHttp">—</div>
                         <div class="k">Entries</div><div class="v mono" id="mEntries">—</div>
@@ -687,7 +827,7 @@
                         <div class="k">Flags</div><div class="v" id="mFlags">—</div>
                     </div>
                     <div id="errorWrap" style="margin-top:10px; display:none;"></div>
-                </div>
+                </details>
             </aside>
 
             <section class="dt-content">
@@ -850,6 +990,11 @@
         const btnApplySearch = el('btnApplySearch');
         const btnClearSearch = el('btnClearSearch');
 
+        const envBanner = el('envBanner');
+
+        const blockFile = el('blockFile');
+        const blockRun = el('blockRun');
+
         let selectedFile = null;
         let lastData = null;
         let lastRawJson = '';
@@ -900,6 +1045,35 @@
             chipStatus.className = `chip ${kind || ''}`.trim();
         }
 
+        function showEnvBanner(html) {
+            if (!envBanner) return;
+            envBanner.innerHTML = html;
+            envBanner.style.display = 'block';
+        }
+
+        function hideEnvBanner() {
+            if (!envBanner) return;
+            envBanner.style.display = 'none';
+            envBanner.innerHTML = '';
+        }
+
+        function updateTopHeights() {
+            const top = document.querySelector('.dt-top');
+            const h = top ? top.offsetHeight : 44;
+            document.documentElement.style.setProperty('--dtTopH', `${Math.max(44, h)}px`);
+        }
+
+        function updateDockHeights() {
+            const dock = document.querySelector('.dt-actions');
+            const isMobile = window.matchMedia('(max-width: 980px)').matches;
+            const h = (dock && isMobile) ? dock.offsetHeight : 0;
+            document.documentElement.style.setProperty('--dtDockH', `${Math.max(0, h)}px`);
+        }
+
+        updateTopHeights();
+        updateDockHeights();
+        window.addEventListener('resize', () => { updateTopHeights(); updateDockHeights(); });
+
         function setCourseStatus(text, kind) {
             if (!courseStatus) return;
             courseStatus.textContent = text || '';
@@ -917,6 +1091,10 @@
         async function refreshSession() {
             try {
                 const res = await fetch('/admin/me', { credentials: 'include' });
+                if (res.status === 404) {
+                    // Common: user opened debug.html as file:// or via a static server.
+                    throw new Error('This page must be opened from the API server (not file/static).');
+                }
                 if (!res.ok) throw new Error('not authed');
                 const j = await res.json().catch(() => ({}));
                 const u = (j && j.username) ? j.username : 'admin';
@@ -962,8 +1140,20 @@
             setCourseStatus('loading…', 'warn');
             courseTbody.innerHTML = '<tr><td colspan="4" class="hint">Loading…</td></tr>';
             try {
+                if (location.protocol === 'file:') {
+                    throw new Error('Open this page via http://localhost:8000/debug.html (not file://)');
+                }
                 const res = await fetch('/courses', { credentials: 'include' });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                if (!res.ok) {
+                    const txt = await res.text().catch(() => '');
+                    if (res.status === 404 && /File not found/i.test(txt)) {
+                        throw new Error('Open this page from the FastAPI server (not a static preview).');
+                    }
+                    if (res.status === 403) {
+                        throw new Error('Login required (403). Open /admin/login then reload.');
+                    }
+                    throw new Error(txt || `HTTP ${res.status}`);
+                }
                 const j = await res.json();
                 const courses = (j && j.courses && typeof j.courses === 'object') ? j.courses : {};
                 const keys = Object.keys(courses).sort();
@@ -1065,6 +1255,9 @@
             return `${(kb / 1024).toFixed(2)} MB`;
         }
 
+        // Escape helper for HTML templating (used by course table and errors)
+        const esc = (s) => htmlEscape(s);
+
         function htmlEscape(s) {
             return (s ?? '').toString()
                 .replace(/&/g, '&amp;')
@@ -1088,6 +1281,8 @@
             selectedFile = file;
             btnRun.disabled = false;
             setStatus('Ready', 'warn');
+
+            if (blockFile) blockFile.style.display = '';
 
             mFile.textContent = file.name;
             mSize.textContent = bytesHuman(file.size);
@@ -1126,6 +1321,16 @@
             if (file) setFile(file);
         });
 
+        // Hide file details block until an image is chosen (mobile-friendly)
+        if (blockFile && window.matchMedia('(max-width: 980px)').matches) {
+            blockFile.style.display = 'none';
+        }
+
+        // Default-collapse the Run section on mobile to reduce scroll
+        if (blockRun && window.matchMedia('(max-width: 980px)').matches) {
+            try { blockRun.open = false; } catch (_) {}
+        }
+
         function setTabs() {
             const buttons = Array.from(document.querySelectorAll('.dt-tab[data-tab]'));
             buttons.forEach(b => b.addEventListener('click', () => {
@@ -1148,7 +1353,22 @@
         });
 
         // Session indicator + keep-alive (best-effort)
-        refreshSession();
+        (async () => {
+            updateTopHeights();
+            if (location.protocol === 'file:') {
+                showEnvBanner(`You opened <span class="mono">debug.html</span> as a file. This page must be served by FastAPI so it can call <span class="mono">/admin/me</span> and <span class="mono">/courses</span>.<br/>Open: <span class="mono">http://localhost:8000/debug.html</span>`);
+                return;
+            }
+
+            const ok = await refreshSession();
+            if (ok) {
+                hideEnvBanner();
+                await refreshCourses();
+            } else {
+                showEnvBanner(`Not logged in. Open <span class="mono">/admin/login</span> then reload this page.`);
+                if (courseTbody) courseTbody.innerHTML = '<tr><td colspan="4" class="hint">Login required to load courses.</td></tr>';
+            }
+        })();
         window.addEventListener('focus', () => refreshSession());
         setInterval(async () => {
             const ok = await refreshSession();
@@ -1332,7 +1552,7 @@
             const start = performance.now();
             let response = null;
             try {
-                response = await fetch('/ocr/debug', { method: 'POST', body: formData });
+                response = await fetch('/ocr/debug', { method: 'POST', body: formData, credentials: 'include' });
                 lastLatencyMs = Math.round(performance.now() - start);
                 lastHttp = response.status;
                 chipTiming.textContent = `${lastLatencyMs} ms`;
@@ -1405,7 +1625,7 @@
                                 const src = (e.course_name_source || 'unknown').toString();
                                 const cls = src === 'ocr' ? 'ok' : (src === 'config' ? 'warn' : 'bad');
                                 const nameHtml = htmlEscape(v);
-                                const badge = `<span class="chip ${cls}" style="margin-left:8px;">${htmlEscape(src)}</span>`;
+                                const badge = `<span class="chip ${cls}" style="margin-left:8px; white-space:nowrap; display:inline-flex;">${htmlEscape(src)}</span>`;
                                 return `<td>${nameHtml}${badge}</td>`;
                             }
 
@@ -1413,7 +1633,7 @@
                         }).join('');
                         return `<tr>${cells}</tr>`;
                     }).join('');
-                    entriesTable.innerHTML = `<table><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table>`;
+                    entriesTable.innerHTML = `<table class="entriesTable"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table>`;
                 } else {
                     entriesEmpty.style.display = 'block';
                     entriesTable.style.display = 'none';

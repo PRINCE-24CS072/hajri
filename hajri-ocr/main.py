@@ -47,7 +47,7 @@ ADMIN_COOKIE_NAME = "hajri_admin"
 ADMIN_SESSION_TTL_SECONDS = int(os.getenv("ADMIN_SESSION_TTL_SECONDS") or "28800")  # 8h
 
 # Process metrics (best-effort, resets on restart)
-BOOT_ID = uuid.uuid4().hex
+BOOT_ID = "hajri-paddleocr-vl"
 STARTED_AT = datetime.now(timezone.utc)
 TOTAL_REQUESTS = 0
 PING_COUNT = 0
@@ -337,43 +337,162 @@ async def serve_debug(request: Request):
 
 @app.get("/admin/login")
 async def admin_login(next: Optional[str] = None, err: Optional[str] = None):
-    _ensure_debug_enabled()
+        _ensure_debug_enabled()
 
-    # only allow relative paths
-    nxt = (next or "/debug.html").strip()
-    if not nxt.startswith("/"):
-        nxt = "/debug.html"
+        # only allow relative paths
+        nxt = (next or "/debug.html").strip()
+        if not nxt.startswith("/"):
+                nxt = "/debug.html"
 
-    err_banner = "" if not err else "<div class=\"err\">Invalid username or password</div>"
+        err_banner = "" if not err else '<div class="err"><strong>Invalid username or password</strong></div>'
 
-    html = f"""<!doctype html>
-<html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-<title>Admin Login</title>
-<style>
-    body{{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; background:#0f1115; color:#fff; margin:0; padding:24px;}}
-    .card{{max-width:420px; margin:60px auto; background:#171b21; border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:18px;}}
-    .h{{font-weight:800; margin:0 0 6px 0;}}
-    .p{{opacity:.75; margin:0 0 14px 0; font-size:13px;}}
-    .err{{margin:10px 0 12px 0; padding:10px 12px; border-radius:10px; border:1px solid rgba(239,68,68,.35); background:rgba(239,68,68,.12); color:rgba(255,255,255,.92); font-size:13px;}}
-    input{{width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.06); color:#fff;}}
-    button{{margin-top:12px; width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:rgba(96,165,250,.22); color:#fff; font-weight:800; cursor:pointer;}}
-    .hint{{opacity:.65; font-size:12px; margin-top:10px;}}
-</style></head>
-<body>
-    <div class=\"card\">
-        <h2 class=\"h\">Admin Login</h2>
-        <p class=\"p\">Login to access debug tools.</p>
-        {err_banner}
-        <form method=\"post\" action=\"/admin/login\">
-            <input type=\"text\" name=\"username\" placeholder=\"Username\" autocomplete=\"username\" required style=\"margin-bottom:10px;\" />
-            <input type=\"password\" name=\"password\" placeholder=\"Password\" autocomplete=\"current-password\" required />
-            <input type=\"hidden\" name=\"next\" value=\"{nxt}\" />
-            <button type=\"submit\">Login</button>
-        </form>
-        
-    </div>
-</body></html>"""
-    return HTMLResponse(content=html)
+        html = f"""<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Admin Login</title>
+        <style>
+            :root {{
+                --bg: #111418;
+                --panel: #171b21;
+                --border: rgba(255, 255, 255, 0.12);
+                --text: rgba(255, 255, 255, 0.92);
+                --muted: rgba(255, 255, 255, 0.65);
+                --good: #22c55e;
+                --bad: #ef4444;
+                --primary: #8ab4f8;
+                --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+                --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+            }}
+            html, body {{ height: 100%; }}
+            *, *::before, *::after {{ box-sizing: border-box; }}
+            body {{ margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }}
+
+            .wrap {{ max-width: 980px; margin: 28px auto; padding: 0 12px; }}
+            .win {{
+                border: 1px solid var(--border);
+                background: var(--panel);
+                border-radius: 14px;
+                overflow: hidden;
+                box-shadow: 0 20px 60px rgba(0,0,0,.55);
+            }}
+            .bar {{
+                display: grid;
+                grid-template-columns: auto 1fr auto;
+                align-items: center;
+                gap: 10px;
+                padding: 12px 14px;
+                border-bottom: 1px solid rgba(255,255,255,.08);
+                background: rgba(255,255,255,.03);
+            }}
+            .dots {{ display: flex; gap: 8px; align-items: center; }}
+            .dot {{ width: 10px; height: 10px; border-radius: 999px; background: rgba(255,255,255,.18); }}
+            .title {{ font-weight: 900; letter-spacing: .02em; color: var(--muted); font-size: 12px; text-align: center; }}
+            .btns {{ display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }}
+            .btn {{
+                border: 1px solid var(--border);
+                background: rgba(0,0,0,.18);
+                color: var(--text);
+                padding: 8px 10px;
+                border-radius: 10px;
+                font-weight: 900;
+                text-decoration: none;
+                cursor: pointer;
+                font-family: var(--sans);
+            }}
+            .btn:hover {{ background: rgba(255,255,255,.06); }}
+            .btn.primary {{ border-color: rgba(138, 180, 248, 0.35); background: rgba(138, 180, 248, 0.12); }}
+
+            .screen {{ padding: 16px 14px 18px 14px; }}
+            .line {{ display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; font-family: var(--mono); }}
+            .prompt {{ color: rgba(138, 180, 248, 0.95); user-select: none; }}
+            .k {{ min-width: 120px; color: var(--muted); }}
+            .v {{ flex: 1; word-break: break-word; }}
+            .hr {{ height: 1px; background: rgba(255,255,255,.08); margin: 14px 0; }}
+
+            .form {{ max-width: 520px; width: 100%; margin: 0 auto; }}
+            .err {{
+                margin: 10px 0 12px 0;
+                padding: 10px 12px;
+                border-radius: 12px;
+                border: 1px solid rgba(239, 68, 68, 0.35);
+                background: rgba(239, 68, 68, 0.10);
+                color: var(--text);
+                font-size: 12px;
+            }}
+            .field {{ margin: 12px 0; }}
+            .label {{ display: block; margin: 0 0 6px 0; color: var(--muted); font-size: 12px; font-family: var(--mono); }}
+            input {{
+                width: 100%;
+                max-width: 100%;
+                padding: 12px 12px;
+                border-radius: 12px;
+                border: 1px solid var(--border);
+                background: rgba(0,0,0,.18);
+                color: var(--text);
+                outline: none;
+                font-family: var(--sans);
+            }}
+            input:focus {{ border-color: rgba(138, 180, 248, 0.35); box-shadow: 0 0 0 3px rgba(138, 180, 248, 0.10); }}
+            button {{
+                margin-top: 12px;
+                width: 100%;
+                padding: 12px 12px;
+                border-radius: 12px;
+                border: 1px solid rgba(138, 180, 248, 0.35);
+                background: rgba(138, 180, 248, 0.12);
+                color: var(--text);
+                font-weight: 900;
+                cursor: pointer;
+                font-family: var(--sans);
+            }}
+            button:hover {{ background: rgba(138, 180, 248, 0.16); }}
+            .hint {{ margin-top: 10px; color: var(--muted); font-size: 12px; font-family: var(--mono); }}
+
+            @media (max-width: 560px) {{
+                .btns {{ gap: 6px; }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="wrap">
+            <div class="win">
+                <div class="bar">
+                    <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+                    <div class="title">HAJRI :: ADMIN LOGIN</div>
+                    <div class="btns">
+                        <a class="btn" href="/ping.html">Ping</a>
+                        <a class="btn primary" href="/debug.html">Debug</a>
+                    </div>
+                </div>
+                <div class="screen">
+                    <div class="line"><div class="prompt">$</div><div class="v">login --next <span style="color:var(--muted)">{nxt}</span></div></div>
+                    <div class="hr"></div>
+
+                    <div class="form">
+                        <div class="line"><div class="prompt">&gt;</div><div class="k">purpose</div><div class="v">Access debug tools</div></div>
+                        {err_banner}
+                        <form method="post" action="/admin/login">
+                            <div class="field">
+                                <label class="label" for="u">username</label>
+                                <input id="u" type="text" name="username" autocomplete="username" required />
+                            </div>
+                            <div class="field">
+                                <label class="label" for="p">password</label>
+                                <input id="p" type="password" name="password" autocomplete="current-password" required />
+                            </div>
+                            <input type="hidden" name="next" value="{nxt}" />
+                            <button type="submit">Login</button>
+                            <div class="hint">Tip: set <strong>ADMIN_USERS_JSON</strong> and <strong>ADMIN_COOKIE_SECRET</strong> in production.</div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>"""
+        return HTMLResponse(content=html)
 
 
 @app.post("/admin/login")
@@ -382,7 +501,6 @@ async def admin_login_post(username: str = Form(...), password: str = Form(...),
     users = _load_admin_users()
     if not users:
         raise HTTPException(status_code=500, detail="Server misconfigured: ADMIN_USERS_JSON missing")
-
     u = (username or "").strip()
     p = (password or "").strip()
     expected_pw = users.get(u)
@@ -589,59 +707,73 @@ def _ping_data() -> dict:
 def _render_ping_terminal(data: dict) -> HTMLResponse:
         now = datetime.now(timezone.utc).isoformat()
         ok = "OK" if data.get("ok") else "FAIL"
+        badge_class = "badge" if ok == "OK" else "badge bad"
         html = f"""<!doctype html>
 <html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
 <title>Ping</title>
 <style>
     :root{{
-        --bg:#070a0e;
-        --panel:#0b1016;
-        --border:rgba(120,255,180,.18);
-        --text:rgba(233,255,243,.92);
-        --muted:rgba(233,255,243,.65);
-        --green:rgba(120,255,180,.95);
-        --green2:rgba(120,255,180,.18);
+        --bg: #111418;
+        --panel: #171b21;
+        --border: rgba(255, 255, 255, 0.12);
+        --text: rgba(255, 255, 255, 0.92);
+        --muted: rgba(255, 255, 255, 0.65);
+        --faint: rgba(255, 255, 255, 0.45);
+        --good: #22c55e;
+        --bad: #ef4444;
+        --primary: #8ab4f8;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
     }}
     html,body{{height:100%;}}
-    body{{margin:0; background:radial-gradient(1200px 600px at 25% 0%, rgba(120,255,180,.08), transparent 55%), var(--bg);
-             color:var(--text);
-             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}}
-    .wrap{{max-width:980px; margin:34px auto; padding:0 18px;}}
-    .win{{border:1px solid var(--border); background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)), var(--panel);
-             border-radius:14px; overflow:hidden; box-shadow: 0 20px 60px rgba(0,0,0,.55);}}
-    .bar{{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px;
-             border-bottom:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.03);}}
+    body{{margin:0; background: var(--bg); color:var(--text); font-family: var(--sans);}}
+
+    .wrap{{max-width:980px; margin:28px auto; padding:0 12px;}}
+    .win{{border:1px solid var(--border); background: var(--panel);
+          border-radius:14px; overflow:hidden; box-shadow: 0 20px 60px rgba(0,0,0,.55);}}
+    .bar{{display:grid; grid-template-columns: auto 1fr auto; align-items:center; gap:10px; padding:12px 14px;
+          border-bottom:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.03);}}
     .dots{{display:flex; gap:8px; align-items:center;}}
     .dot{{width:10px; height:10px; border-radius:999px; background:rgba(255,255,255,.18);}}
-    .title{{font-weight:900; letter-spacing:.02em; color:var(--muted); font-size:12px;}}
+    .title{{font-weight:900; letter-spacing:.02em; color:var(--muted); font-size:12px; text-align:center;}}
+
     .btns{{display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;}}
-    .btn{{border:1px solid rgba(120,255,180,.22); background:rgba(120,255,180,.08); color:var(--text);
-             padding:8px 10px; border-radius:10px; font-weight:900; text-decoration:none; cursor:pointer;}}
-    .btn:hover{{background:rgba(120,255,180,.12);}}
-    .screen{{padding:16px 14px 18px 14px;}}
+    .btn{{border:1px solid var(--border); background:rgba(0,0,0,.18); color:var(--text);
+          padding:8px 10px; border-radius:10px; font-weight:900; text-decoration:none; cursor:pointer; font-family: var(--sans);}}
+    .btn:hover{{background:rgba(255,255,255,.06);}}
+    .btn.primary{{border-color: rgba(138, 180, 248, 0.35); background: rgba(138, 180, 248, 0.12);}}
+
+    .screen{{padding:16px 14px 18px 14px; font-family: var(--mono);}}
     .line{{display:flex; gap:10px; align-items:flex-start; margin:8px 0;}}
-    .prompt{{color:var(--green); user-select:none;}}
+    .prompt{{color: rgba(138, 180, 248, 0.95); user-select:none;}}
     .k{{min-width:180px; color:var(--muted);}}
     .v{{flex:1; word-break:break-word;}}
     .hr{{height:1px; background:rgba(255,255,255,.08); margin:14px 0;}}
-    .badge{{display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid var(--green2); color:var(--green);
-                font-weight:900; font-size:12px;}}
+    .badge{{display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid rgba(34, 197, 94, 0.35); color: rgba(34, 197, 94, 0.95);
+            background: rgba(34, 197, 94, 0.10);
+            font-weight:900; font-size:12px;}}
+    .badge.bad{{border-color: rgba(239, 68, 68, 0.35); color: rgba(239, 68, 68, 0.95); background: rgba(239, 68, 68, 0.10);}}
     .foot{{margin-top:12px; color:var(--muted); font-size:12px;}}
+
+    @media (max-width: 560px){{
+        .k{{min-width:120px;}}
+        .btns{{gap:6px;}}
+    }}
 </style></head>
 <body>
     <div class=\"wrap\">
         <div class=\"win\">
             <div class=\"bar\">
                 <div class=\"dots\"><span class=\"dot\"></span><span class=\"dot\"></span><span class=\"dot\"></span></div>
-                <div class=\"title\">HAJRI :: STATUS TERMINAL</div>
+                <div class=\"title\">HAJRI :: PING</div>
                 <div class=\"btns\">
                     <button class=\"btn\" type=\"button\" onclick=\"location.reload()\">Refresh</button>
                     <a class=\"btn\" href=\"/ping?format=json\">JSON</a>
-                    <a class=\"btn\" href=\"/admin/login?next=/debug.html\">Admin Login</a>
+                    <a class=\"btn primary\" href=\"/admin/login?next=/debug.html\">Admin Login</a>
                 </div>
             </div>
             <div class=\"screen\">
-                <div class=\"line\"><div class=\"prompt\">$</div><div class=\"v\">ping <span class=\"badge\">{ok}</span> <span style=\"color:var(--muted)\">@ {now}</span></div></div>
+                <div class=\"line\"><div class=\"prompt\">$</div><div class=\"v\">ping <span class=\"{badge_class}\">{ok}</span> <span style=\"color:var(--muted)\">@ {now}</span></div></div>
                 <div class=\"hr\"></div>
 
                 <div class=\"line\"><div class=\"prompt\">&gt;</div><div class=\"k\">boot_id</div><div class=\"v\">{data.get('boot_id')}</div></div>
