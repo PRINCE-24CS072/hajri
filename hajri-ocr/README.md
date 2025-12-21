@@ -1,188 +1,89 @@
-# HAJRI OCR - Attendance Table Extractor
+# HAJRI OCR
 
-**Anchor-based OCR table extraction for university attendance screenshots**
+FastAPI backend that extracts attendance entries from university dashboard screenshots using a **hosted PaddleOCR PP-Structure (layout-parsing) API**.
 
-## 🎯 What This Does
-
-Extracts attendance data from borderless table screenshots using deterministic, geometry-based OCR.
-
-**NO machine learning. NO training. NO datasets.**  
-Pure rule-based extraction using PaddleOCR + regex + geometry.
-
-## 🚀 Features
-
-- 🎯 **Zoom-Independent**: Automatic modal detection and cropping
-- ⚓ **Anchor-based extraction**: Rows defined by (course_code + class_type) pairs
-- 📐 **Geometry matching**: Column zoning + distance-based field attachment
-- 🔍 **Classical CV**: OCR-assisted modal detection (no heavy ML)
-- 💻 **CPU-only**: No GPU required
-- 🎨 **Debuggable**: Clear logic, extensive logging
-- ⚡ **FastAPI REST API**: Production-ready endpoints
-- 🖼️ **Test UI**: Interactive testing interface
-
-## 🏗️ System Architecture
-
-```
-Screenshot (any zoom level)
- ↓
-Modal detection & crop ← NEW!
- ↓
-Normalize to 1280px width
- ↓
-PaddleOCR
- ↓
-Anchor-based extraction
- ↓
-JSON output
-```
-
-**Key Innovation:** The system automatically detects and crops the attendance modal, making it work reliably on both zoomed-in and zoomed-out screenshots.
-
-## Quick Start
-
-### Local Development
+## Quick Start (local)
 
 ```bash
-# Install dependencies
+cd hajri-ocr
 pip install -r requirements.txt
 
-# Copy environment file
 cp .env.example .env
+# Edit .env and set:
+# PADDLEOCR_VL_API_URL=https://.../layout-parsing
+# PADDLEOCR_VL_API_TOKEN=...
 
-# Run server
 uvicorn main:app --reload
 ```
 
-Server runs at: `http://localhost:8000`
-- OCR Test UI: `http://localhost:8000/test.html`
-- Course Manager: `http://localhost:8000/courses.html`
+Useful URLs:
+- `http://localhost:8000/ping.html`
+- `http://localhost:8000/health`
 
-## Deploy to Render
-
-1. **Push to GitHub**
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/YOUR_USERNAME/hajri-ocr.git
-git push -u origin main
-```
-
-2. **Create Render Web Service**
-   - Go to [render.com](https://render.com)
-   - Click "New +" → "Web Service"
-   - Connect your GitHub repo
-   - Render auto-detects `render.yaml`
-   - Click "Create Web Service"
-
-3. **Done!** Your API will be live at `https://YOUR_APP.onrender.com`
-
-## API Endpoints
-
-### `POST /ocr/extract`
-Extract attendance from screenshot
-- **Body**: `file` (multipart/form-data image)
-- **Returns**: JSON array of attendance entries
-
-### `GET /courses`
-List all configured courses
-
-### `POST /courses/{code}`
-Add/update course
-- **Body**: `{"name": "Course Name", "abbr": "CODE"}`
-
-### `DELETE /courses/{code}`
-Remove course
-
-### `GET /health`
-Health check for monitoring
+If `ENABLE_DEBUG_UI=true`:
+- `http://localhost:8000/admin/login`
+- `http://localhost:8000/debug.html`
 
 ## Configuration
 
-Edit `.env`:
-```bash
-PORT=8000
-LOG_LEVEL=info  # info, warning, error
-```
+Required:
+- `PADDLEOCR_VL_API_URL`
+- `PADDLEOCR_VL_API_TOKEN`
 
-## Course Database
+Recommended (public deployments):
+- `ENV=production`
+- `APP_API_KEY` (required when `ENV=production`)
 
-Manage courses at `/courses.html` or edit `course_config.json`:
-```json
-{
-  "courses": {
-    "CEUC201": {
-      "name": "FUNDAMENTALS OF SOFTWARE ENGINEERING",
-      "abbr": "FSE"
-    }
-  }
-}
-```
+Optional:
+- `ENABLE_DEBUG_UI` (default `false` in `render.yaml`)
+- `ENABLE_DOCS` (default `false` in `render.yaml`)
 
-## Tech Stack
+If `ENABLE_DEBUG_UI=true` in production:
+- `ADMIN_COOKIE_SECRET` (required)
+- `ADMIN_USERS_JSON` (required, map of username → password)
 
-- **Framework**: FastAPI + Uvicorn
-- **OCR**: PaddleOCR 2.7.3
-- **Image Processing**: OpenCV + Pillow
-- **Fuzzy Matching**: difflib
-- **Python**: 3.11+
+Optional (Postman/curl):
+- `DEBUG_ADMIN_KEY` (header-based admin access via `X-Admin-Key`)
 
-## License
+## Course Mapping
 
-MIT
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+Course name resolution is loaded from `course_config.json`.
 
-### Test with Sample Image
+Edit `course_config.json` to add/update courses (the app reads it from disk).
 
-1. Create a `test_images/` folder
-2. Add your dashboard screenshot
-3. Visit: http://localhost:8000/test/sample
+`course_config.example.json` is included as a reference/template.
 
 ## API Endpoints
 
-### `POST /ocr/extract`
+- `POST /ocr/extract` (requires `APP_API_KEY` when `ENV=production`)
+- `POST /ocr/extract/tuning` (legacy alias of `/ocr/extract`)
+- `GET /health`
+- `GET /ping` (JSON by default)
+- `GET /ping.html` (terminal-style HTML)
 
-Upload an image file for extraction.
+Debug/admin (only when `ENABLE_DEBUG_UI=true`):
+- `GET /admin/login` / `POST /admin/login` / `POST /admin/logout`
+- `GET /debug.html` (requires admin)
+- `POST /ocr/debug` (requires admin)
 
-**Request:**
+Example request:
+
 ```bash
 curl -X POST http://localhost:8000/ocr/extract \
+  -H "X-API-Key: YOUR_APP_API_KEY" \
   -F "file=@dashboard.png"
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Successfully extracted 7 attendance entries",
-  "entries": [
-    {
-      "course_code": "CEUC201/FSE",
-      "course_name": "FUNDAMENTALS OF SOFTWARE ENGINEERING",
-      "class_type": "LECT",
-      "present": 12,
-      "total": 15,
-      "percentage": 80.0,
-      "confidence": 0.95
-    }
-  ],
-  "metadata": {
-    "total_rows": 8,
-    "filtered_rows": 0,
-    "avg_confidence": 0.89,
-    "processing_time_ms": 1234
-  }
-}
-```
+## Deploy to Render
 
-### `GET /health`
+This repo includes `render.yaml`. In Render, set the **Root Directory** to `hajri-ocr`, and configure secrets in Environment:
+- `PADDLEOCR_VL_API_URL`
+- `PADDLEOCR_VL_API_TOKEN`
+- `APP_API_KEY`
 
-Check service health.
-
-```bash
-curl http://localhost:8000/health
-```
+If you enable debug UI on Render:
+- `ADMIN_COOKIE_SECRET`
+- `ADMIN_USERS_JSON`
 
 ## Configuration
 

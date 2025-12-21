@@ -9,7 +9,12 @@ from datetime import datetime
 class AttendanceEntry(BaseModel):
     """Single attendance record extracted from table"""
     course_code: str = Field(..., description="Course code (e.g., CEUC201/FSE)")
+    shortname: str = Field(default="", description="Course short name / abbreviation (e.g., FSE)")
     course_name: str = Field(..., description="Full course name")
+    course_name_source: str = Field(
+        default="unknown",
+        description="Where course_name came from: ocr|config|unknown"
+    )
     class_type: str = Field(..., description="LECT or LAB")
     present: int = Field(..., ge=0, description="Classes attended")
     total: int = Field(..., ge=0, description="Total classes conducted")

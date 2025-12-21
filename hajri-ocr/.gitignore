@@ -13,6 +13,12 @@ ENV/
 .env
 .env.local
 
+# Local debug artifacts
+last_markdown.txt
+last_api_markdown.txt
+
+
+
 # IDE
 .vscode/
 .idea/

@@ -1,8 +1,6 @@
 # 🚀 Quick Deploy Guide
 
-## ✅ Git is Ready!
-
-Your code is committed and ready to push to GitHub.
+## ✅ GitHub + Render Deploy
 
 ## 📝 Next Steps
 
@@ -48,6 +46,9 @@ curl https://YOUR_APP.onrender.com/health
 # Should return: {"status": "healthy", "service": "hajri-ocr-api"}
 ```
 
+Optional:
+- `https://YOUR_APP.onrender.com/ping.html`
+
 ## 🎯 Important Render Settings
 
 When creating the web service on Render:
@@ -69,9 +70,11 @@ object ApiConfig {
 }
 ```
 
-## 🔧 Manage Courses
+## 🔐 Security Notes
 
-Visit: `https://YOUR_APP.onrender.com/courses.html`
+- Set `APP_API_KEY` on Render (required in production).
+- Keep `ENABLE_DEBUG_UI=false` unless you need debug tools.
+- If you set `ENABLE_DEBUG_UI=true`, also set `ADMIN_COOKIE_SECRET` and `ADMIN_USERS_JSON`.
 
 ## ✨ Done!
 

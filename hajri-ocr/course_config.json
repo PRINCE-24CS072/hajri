@@ -55,6 +55,10 @@
     "PSUD101": {
       "name": "ENGINEERING PHYSICS I",
       "abbr": "EP-I"
+    },
+    "CEUC203": {
+      "name": "FOUNDATION OF DATA SCIENCE AND ANALYSIS",
+      "abbr": "FDSA"
     }
   },
   "validation": {

@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hajri OCR | Debug Console</title>
+    <style>
+        :root {
+            --bg: #111418;
+            --panel: #171b21;
+            --border: rgba(255, 255, 255, 0.12);
+            --text: rgba(255, 255, 255, 0.92);
+            --muted: rgba(255, 255, 255, 0.65);
+            --faint: rgba(255, 255, 255, 0.45);
+            --good: #22c55e;
+            --warn: #f59e0b;
+            --bad: #ef4444;
+            --primary: #8ab4f8;
+            --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            --radius: 8px;
+            --radius2: 6px;
+            --pad-1: 8px;
+            --pad-2: 10px;
+            --pad-3: 12px;
+        }
+
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            font-family: var(--sans);
+            background: var(--bg);
+            color: var(--text);
+            padding: 12px;
+            overflow-x: hidden;
+        }
+
+        a { color: var(--primary); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .shell { max-width: 1500px; margin: 0 auto; }
+
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--panel);
+            padding: var(--pad-2) var(--pad-3);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .brand {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .brand .title {
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            font-size: 14px;
+        }
+        .brand .sub { color: var(--muted); font-size: 12px; }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .chip {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 4px 8px;
+            font-size: 11px;
+            color: var(--muted);
+            background: rgba(0,0,0,0.22);
+        }
+        .chip.ok { color: rgba(34, 197, 94, 0.95); border-color: rgba(34, 197, 94, 0.35); background: rgba(34, 197, 94, 0.10); }
+        .chip.bad { color: rgba(239, 68, 68, 0.95); border-color: rgba(239, 68, 68, 0.35); background: rgba(239, 68, 68, 0.10); }
+        .chip.warn { color: rgba(245, 158, 11, 0.95); border-color: rgba(245, 158, 11, 0.35); background: rgba(245, 158, 11, 0.10); }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 10px;
+            align-items: start;
+            min-width: 0;
+        }
+
+        /* Critical: prevent long text from forcing grid expansion */
+        .layout > * { min-width: 0; }
+
+        .card {
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--panel);
+            overflow: hidden;
+        }
+        .card-header {
+            padding: var(--pad-2) var(--pad-3);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .card-title { font-weight: 900; letter-spacing: -0.01em; font-size: 12px; color: rgba(255,255,255,0.92); text-transform: uppercase; }
+        .card-body { padding: var(--pad-3); min-width: 0; }
+
+        .hint { color: var(--muted); font-size: 12px; line-height: 1.4; }
+
+        .drop {
+            border: 1px dashed rgba(255,255,255,0.25);
+            border-radius: var(--radius2);
+            background: rgba(0,0,0,0.18);
+            padding: var(--pad-3);
+            cursor: pointer;
+            transition: border-color 120ms ease, background 120ms ease;
+        }
+        .drop:hover { border-color: rgba(96, 165, 250, 0.7); background: rgba(96, 165, 250, 0.08); }
+        .drop.dragover { border-color: rgba(167, 139, 250, 0.7); background: rgba(167, 139, 250, 0.10); }
+        input[type="file"] { display: none; }
+
+        .btn {
+            border: 1px solid rgba(255,255,255,0.18);
+            background: rgba(255,255,255,0.08);
+            color: var(--text);
+            padding: 8px 10px;
+            border-radius: var(--radius2);
+            cursor: pointer;
+            font-weight: 800;
+            font-size: 12px;
+        }
+        .btn:hover { background: rgba(255,255,255,0.12); }
+        .btn.primary {
+            background: rgba(96, 165, 250, 0.22);
+            border-color: rgba(255,255,255,0.28);
+        }
+        .btn.primary:hover { filter: brightness(1.05); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .row.space { justify-content: space-between; }
+        .mono { font-family: var(--mono); }
+
+        textarea.input {
+            width: 100%;
+            min-height: 120px;
+            resize: vertical;
+            padding-top: 10px;
+        }
+
+        .mini-grid {
+            display: grid;
+            grid-template-columns: 86px 1fr;
+            gap: 8px 10px;
+            align-items: center;
+            margin-top: 10px;
+        }
+        .mini-grid .k { color: var(--muted); font-size: 11px; }
+        .mini-grid .input { min-width: 0; width: 100%; }
+
+        .course-list {
+            margin-top: 10px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius2);
+            background: rgba(0,0,0,0.18);
+            overflow: auto;
+            max-height: 260px;
+        }
+        .course-list table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        .course-list th, .course-list td { padding: 7px 8px; border-bottom: 1px solid rgba(255,255,255,0.10); }
+        .course-list th { position: sticky; top: 0; background: rgba(255,255,255,0.06); }
+        .course-list td { vertical-align: top; }
+        .course-actions { display: flex; gap: 6px; align-items: center; }
+        .btn.small { padding: 5px 7px; font-size: 11px; border-radius: 7px; }
+
+        details.dt-details {
+            border: 1px solid var(--border);
+            border-radius: var(--radius2);
+            background: rgba(0,0,0,0.10);
+            padding: 10px;
+        }
+        details.dt-details > summary {
+            cursor: pointer;
+            list-style: none;
+            font-weight: 900;
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.82);
+            outline: none;
+        }
+        details.dt-details > summary::-webkit-details-marker { display: none; }
+        details.dt-details[open] > summary { margin-bottom: 8px; }
+
+        .kv {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 8px 12px;
+            align-items: start;
+            font-size: 11px;
+        }
+        .kv .k { color: var(--muted); }
+        .kv .v { color: rgba(255,255,255,0.92); word-break: break-word; min-width: 0; }
+
+        /* Prevent flag chips from overlapping in narrow sidebar */
+        #mFlags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+            min-width: 0;
+        }
+        #mFlags .chip { max-width: 100%; }
+
+        .preview {
+            margin-top: 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius2);
+            background: rgba(0,0,0,0.22);
+            height: 200px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .tab {
+            border: 1px solid var(--border);
+            background: rgba(0,0,0,0.18);
+            color: var(--muted);
+            padding: 6px 9px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 900;
+        }
+        .tab.active {
+            color: rgba(255,255,255,0.95);
+            border-color: rgba(96, 165, 250, 0.5);
+            background: rgba(96, 165, 250, 0.12);
+        }
+
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        .panel { min-width: 0; }
+
+        pre {
+            margin: 0;
+            padding: var(--pad-3);
+            border-radius: var(--radius2);
+            border: 1px solid var(--border);
+            background: rgba(0,0,0,0.30);
+            color: rgba(255,255,255,0.88);
+            font-family: var(--mono);
+            font-size: 11px;
+            line-height: 1.45;
+            max-height: 560px;
+            overflow: auto;
+            /* Wrap long lines so the page never stretches */
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            max-width: 100%;
+        }
+
+        .split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            align-items: start;
+            min-width: 0;
+        }
+        .split > * { min-width: 0; }
+        .pane {
+            border: 1px solid var(--border);
+            border-radius: var(--radius2);
+            background: rgba(0,0,0,0.14);
+            overflow: hidden;
+            min-width: 0;
+        }
+        .pane-head {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: rgba(0,0,0,0.22);
+        }
+        .pane-title {
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.82);
+        }
+        .pane-body { padding: 0; }
+        .pane-body pre { border: 0; border-radius: 0; max-height: 520px; }
+
+        .callouts {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(140px, 1fr));
+            gap: 8px;
+        }
+        .metric {
+            border: 1px solid var(--border);
+            border-radius: var(--radius2);
+            background: rgba(0,0,0,0.18);
+            padding: 8px 10px;
+        }
+        .metric .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+        .metric .value { font-weight: 900; font-size: 14px; letter-spacing: -0.02em; margin-top: 2px; }
+
+        .table-wrap {
+            border: 1px solid var(--border);
+            border-radius: var(--radius2);
+            overflow: auto;
+            background: rgba(0,0,0,0.18);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        th, td {
+            padding: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.10);
+            text-align: left;
+        }
+        th { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.06); position: sticky; top: 0; }
+        tr:hover td { background: rgba(255,255,255,0.05); }
+
+        .thumbs {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, 160px);
+            gap: 8px;
+            align-items: start;
+            justify-content: start;
+        }
+        .thumb {
+            border: 1px solid var(--border);
+            border-radius: var(--radius2);
+            background: rgba(0,0,0,0.18);
+            width: 160px;
+            aspect-ratio: 16 / 9;
+            overflow: hidden;
+            display: grid;
+            place-items: center;
+        }
+        .thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+        .thumb a { display: contents; }
+
+        .search {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .input {
+            border: 1px solid var(--border);
+            border-radius: var(--radius2);
+            background: rgba(0,0,0,0.20);
+            color: rgba(255,255,255,0.92);
+            padding: 7px 9px;
+            outline: none;
+            font-size: 11px;
+            min-width: 220px;
+        }
+        .input::placeholder { color: rgba(255,255,255,0.45); }
+
+        .md-render {
+            border: 1px solid var(--border);
+            border-radius: var(--radius2);
+            background: rgba(0,0,0,0.18);
+            padding: var(--pad-3);
+            max-height: 560px;
+            overflow: auto;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+        .md-render code { font-family: var(--mono); background: rgba(0,0,0,0.20); padding: 2px 6px; border-radius: 8px; }
+        .md-render h1, .md-render h2, .md-render h3 { margin: 10px 0 6px; }
+        .md-render p { margin: 8px 0; color: rgba(255,255,255,0.88); }
+        .md-render table { font-size: 12px; }
+        .md-render img { max-width: 100%; height: auto; }
+
+        .errorbox {
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            background: rgba(239, 68, 68, 0.10);
+            color: rgba(255,255,255,0.90);
+            border-radius: var(--radius2);
+            padding: 9px 10px;
+            font-size: 11px;
+            font-family: var(--mono);
+            white-space: pre-wrap;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.20);
+            border-top-color: rgba(96, 165, 250, 0.95);
+            border-radius: 999px;
+            animation: spin 700ms linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 980px) {
+            .layout { grid-template-columns: 1fr; }
+            .topbar { top: 0; }
+            .callouts { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+            .preview { height: 200px; }
+            .split { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 460px) {
+            .thumbs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .thumb { width: 100%; }
+        }
+
+        /* =========================
+           DevTools layout override
+           ========================= */
+        body { padding: 0; overflow: hidden; }
+        .shell { max-width: none; margin: 0; }
+
+        .devtools {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .dt-top {
+            height: 44px;
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 0 12px;
+            border-bottom: 1px solid var(--border);
+            background: var(--panel);
+            min-width: 0;
+        }
+
+        .dt-brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+        .dt-title { font-weight: 900; font-size: 13px; letter-spacing: 0.02em; white-space: nowrap; }
+        .dt-sub {
+            color: var(--muted);
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 52vw;
+        }
+
+        .dt-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+        .dt-main {
+            flex: 1 1 auto;
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            min-width: 0;
+            min-height: 0;
+        }
+
+        .dt-side {
+            border-right: 1px solid var(--border);
+            background: rgba(0,0,0,0.10);
+            min-width: 0;
+            min-height: 0;
+            overflow: auto;
+        }
+
+        .dt-block {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            min-width: 0;
+        }
+
+        .dt-block-title {
+            font-weight: 900;
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.82);
+            margin-bottom: 8px;
+        }
+
+        .dt-content {
+            min-width: 0;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dt-tabs {
+            height: 38px;
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 12px;
+            border-bottom: 1px solid var(--border);
+            background: var(--panel);
+            min-width: 0;
+        }
+
+        .dt-tab {
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--muted);
+            border-radius: 7px;
+            padding: 6px 10px;
+            font-weight: 900;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .dt-tab:hover { background: rgba(255,255,255,0.06); }
+        .dt-tab.active {
+            color: rgba(255,255,255,0.95);
+            border-color: rgba(138, 180, 248, 0.35);
+            background: rgba(138, 180, 248, 0.12);
+        }
+
+        .dt-panels {
+            flex: 1 1 auto;
+            min-width: 0;
+            min-height: 0;
+            overflow: auto;
+            padding: 12px;
+        }
+
+        /* Ensure long text never forces horizontal stretch */
+        .devtools, .dt-main, .dt-content, .dt-panels, .panel, .split, .pane, .pane-body { min-width: 0; }
+        pre { max-width: 100%; }
+        .md-render { max-width: 100%; overflow: auto; }
+
+        @media (max-width: 980px) {
+            .dt-main { grid-template-columns: 1fr; }
+            .dt-side { border-right: 0; border-bottom: 1px solid var(--border); }
+            .dt-sub { max-width: 70vw; }
+        }
+
+        @media (max-width: 420px) {
+            .dt-sub { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="devtools">
+        <div class="dt-top">
+            <div class="dt-brand">
+                <div class="dt-title">Hajri OCR — Debug</div>
+                <div class="dt-sub">Upload → POST /ocr/debug → inspect entries, markdown, request/response</div>
+            </div>
+            <div class="dt-right">
+                <span class="chip mono" id="chipEndpoint">POST /ocr/debug</span>
+                <span class="chip" id="chipStatus">Idle</span>
+                <span class="chip mono" id="chipTiming">— ms</span>
+                <span class="chip mono" id="chipSession">session: …</span>
+                <button class="btn" id="btnLogout" type="button">Logout</button>
+                <button class="btn" id="btnCopyCurl" type="button">Copy cURL</button>
+                <button class="btn primary" id="btnRun" type="button" disabled>Run</button>
+            </div>
+        </div>
+
+        <div class="dt-main">
+            <aside class="dt-side">
+                <div class="dt-block">
+                    <div class="dt-block-title">Upload</div>
+                    <div class="drop" id="dropZone">
+                        <div style="font-weight:900;">Drop image here or click</div>
+                        <div class="hint">Mobile screenshots are fine. Max ~10MB.</div>
+                        <input id="fileInput" type="file" accept="image/*" />
+                    </div>
+                    <div class="preview" id="previewBox" style="display:none;">
+                        <img id="previewImg" alt="preview" />
+                    </div>
+                </div>
+
+                <div class="dt-block">
+                    <div class="dt-block-title">File</div>
+                    <div class="kv mono">
+                        <div class="k">Name</div><div class="v" id="mFile">—</div>
+                        <div class="k">Size</div><div class="v" id="mSize">—</div>
+                        <div class="k">Dims</div><div class="v" id="mDims">—</div>
+                        <div class="k">Aspect</div><div class="v" id="mAspect">—</div>
+                    </div>
+                </div>
+
+                <div class="dt-block">
+                    <details class="dt-details">
+                        <summary>Advanced overrides</summary>
+                        <div class="hint">Only for debugging. Temporarily changes PP-Structure options or course mappings for this browser. Normal usage: ignore this.</div>
+
+                        <div style="margin-top:10px;">
+                            <div class="hint mono" style="margin-bottom:6px;">api_options_override (JSON)</div>
+                            <textarea class="input mono" id="optOverride" spellcheck="false" placeholder="{}"></textarea>
+                        </div>
+
+                        <div style="margin-top:10px;">
+                            <div class="hint mono" style="margin-bottom:6px;">course_db_override (JSON)</div>
+                            <textarea class="input mono" id="courseOverride" spellcheck="false" placeholder="{}"></textarea>
+                        </div>
+
+                        <div class="row" style="margin-top:10px;">
+                            <button class="btn" id="btnResetOverrides" type="button">Reset</button>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="dt-block">
+                    <div class="dt-block-title">Course Mapping</div>
+                    <div class="hint">Add / edit / remove courses (writes to <span class="mono">course_config.json</span>). Requires admin session.</div>
+
+                    <div class="mini-grid" style="margin-top:10px;">
+                        <div class="k mono">Code</div>
+                        <input class="input mono" id="courseCode" placeholder="CEUC201" />
+
+                        <div class="k mono">Abbr</div>
+                        <input class="input mono" id="courseAbbr" placeholder="FSE" />
+
+                        <div class="k mono">Name</div>
+                        <input class="input" id="courseName" placeholder="FUNDAMENTALS OF SOFTWARE ENGINEERING" />
+                    </div>
+
+                    <div class="row" style="margin-top:10px;">
+                        <button class="btn primary" id="btnCourseSave" type="button">Save</button>
+                        <button class="btn" id="btnCourseClear" type="button">Clear</button>
+                        <button class="btn" id="btnCourseRefresh" type="button">Refresh</button>
+                        <span class="hint mono" id="courseStatus" style="margin-left:6px;"></span>
+                    </div>
+
+                    <div class="course-list" style="margin-top:10px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="mono">Code</th>
+                                    <th class="mono">Abbr</th>
+                                    <th>Name</th>
+                                    <th class="mono">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="courseTbody">
+                                <tr><td colspan="4" class="hint">Loading…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="dt-block" style="border-bottom:0;">
+                    <div class="dt-block-title">Run</div>
+                    <div class="kv">
+                        <div class="k">HTTP</div><div class="v mono" id="mHttp">—</div>
+                        <div class="k">Entries</div><div class="v mono" id="mEntries">—</div>
+                        <div class="k">Markdown</div><div class="v mono" id="mMdLen">—</div>
+                        <div class="k">Flags</div><div class="v" id="mFlags">—</div>
+                    </div>
+                    <div id="errorWrap" style="margin-top:10px; display:none;"></div>
+                </div>
+            </aside>
+
+            <section class="dt-content">
+                <div class="dt-tabs" role="tablist">
+                    <button class="dt-tab active" data-tab="overview" type="button">Overview</button>
+                    <button class="dt-tab" data-tab="entries" type="button">Entries</button>
+                    <button class="dt-tab" data-tab="markdown" type="button">Markdown</button>
+                    <button class="dt-tab" data-tab="api" type="button">Network</button>
+                </div>
+
+                <div class="dt-panels">
+                    <div class="panel active" id="panel-overview">
+                        <div class="callouts">
+                            <div class="metric"><div class="label">Entries</div><div class="value" id="ovEntries">—</div></div>
+                            <div class="metric"><div class="label">Markdown</div><div class="value" id="ovMd">—</div></div>
+                            <div class="metric"><div class="label">HTTP</div><div class="value" id="ovHttp">—</div></div>
+                            <div class="metric"><div class="label">Latency</div><div class="value" id="ovLatency">—</div></div>
+                        </div>
+                        <div style="height: 10px;"></div>
+                        <div class="card" style="margin:0; background: rgba(0,0,0,0.14);">
+                            <div class="card-header"><div class="card-title">Parsing flags</div></div>
+                            <div class="card-body hint" id="ovFlags">—</div>
+                        </div>
+                    </div>
+
+                    <div class="panel" id="panel-entries">
+                        <div class="row space" style="margin-bottom:10px;">
+                            <div class="hint">Parsed entries table from backend parser.</div>
+                            <div class="row">
+                                <button class="btn" id="btnCopyCsv" type="button">Copy CSV</button>
+                                <button class="btn" id="btnDownloadCsv" type="button">Download CSV</button>
+                            </div>
+                        </div>
+                        <div id="entriesEmpty" class="hint">Run a debug request to see entries.</div>
+                        <div id="entriesTable" class="table-wrap" style="display:none;"></div>
+                    </div>
+
+                    <div class="panel" id="panel-markdown">
+                        <div class="row space" style="margin-bottom:10px;">
+                            <div class="hint">Raw markdown/HTML from the OCR model + sanitized render.</div>
+                            <div class="row">
+                                <button class="btn" id="btnCopyMd" type="button">Copy</button>
+                                <button class="btn" id="btnDownloadMd" type="button">Download</button>
+                            </div>
+                        </div>
+                        <div class="split">
+                            <div class="pane">
+                                <div class="pane-head"><div class="pane-title">Raw</div></div>
+                                <div class="pane-body"><pre id="mdRaw">—</pre></div>
+                            </div>
+                            <div class="pane">
+                                <div class="pane-head"><div class="pane-title">Rendered (sanitized)</div></div>
+                                <div class="pane-body"><div class="md-render" id="mdRender">—</div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel" id="panel-api">
+                        <div class="row space" style="margin-bottom:10px;">
+                            <div class="hint">Request payload (sanitized) + raw response JSON.</div>
+                            <div class="row">
+                                <button class="btn" id="btnCopyReqJson" type="button">Copy Req</button>
+                                <button class="btn" id="btnDownloadReqJson" type="button">DL Req</button>
+                                <button class="btn" id="btnCopyJson" type="button">Copy Res</button>
+                                <button class="btn" id="btnDownloadJson" type="button">DL Res</button>
+                            </div>
+                        </div>
+                        <div id="apiImagesWrap" style="margin-bottom:12px; display:none;">
+                            <div class="thumbs" id="apiThumbs"></div>
+                        </div>
+                        <div class="search" style="margin-bottom:10px;">
+                            <input class="input mono" id="jsonSearch" placeholder="Search in response JSON (substring)" />
+                            <button class="btn" id="btnApplySearch" type="button">Highlight</button>
+                            <button class="btn" id="btnClearSearch" type="button">Clear</button>
+                            <div class="hint" id="jsonSearchInfo"></div>
+                        </div>
+                        <div class="split">
+                            <div class="pane">
+                                <div class="pane-head"><div class="pane-title">Request</div></div>
+                                <div class="pane-body"><pre id="reqJson">—</pre></div>
+                            </div>
+                            <div class="pane">
+                                <div class="pane-head"><div class="pane-title">Response</div></div>
+                                <div class="pane-body"><pre id="apiJson">—</pre></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        const el = (id) => document.getElementById(id);
+
+        const dropZone = el('dropZone');
+        const fileInput = el('fileInput');
+        const btnRun = el('btnRun');
+        const btnCopyCurl = el('btnCopyCurl');
+        const chipStatus = el('chipStatus');
+        const chipTiming = el('chipTiming');
+        const chipSession = el('chipSession');
+        const btnLogout = el('btnLogout');
+
+        const previewBox = el('previewBox');
+        const previewImg = el('previewImg');
+
+        const mFile = el('mFile');
+        const mSize = el('mSize');
+        const mDims = el('mDims');
+        const mAspect = el('mAspect');
+
+        const mHttp = el('mHttp');
+        const mEntries = el('mEntries');
+        const mMdLen = el('mMdLen');
+        const mFlags = el('mFlags');
+        const errorWrap = el('errorWrap');
+
+        const optOverride = el('optOverride');
+        const courseOverride = el('courseOverride');
+        const btnResetOverrides = el('btnResetOverrides');
+
+        const courseCode = el('courseCode');
+        const courseAbbr = el('courseAbbr');
+        const courseName = el('courseName');
+        const btnCourseSave = el('btnCourseSave');
+        const btnCourseClear = el('btnCourseClear');
+        const btnCourseRefresh = el('btnCourseRefresh');
+        const courseStatus = el('courseStatus');
+        const courseTbody = el('courseTbody');
+
+        const ovEntries = el('ovEntries');
+        const ovMd = el('ovMd');
+        const ovHttp = el('ovHttp');
+        const ovLatency = el('ovLatency');
+        const ovFlags = el('ovFlags');
+
+        const entriesEmpty = el('entriesEmpty');
+        const entriesTable = el('entriesTable');
+
+        const mdRaw = el('mdRaw');
+        const mdRender = el('mdRender');
+
+        const apiImagesWrap = el('apiImagesWrap');
+        const apiThumbs = el('apiThumbs');
+        const apiJson = el('apiJson');
+        const jsonSearch = el('jsonSearch');
+        const jsonSearchInfo = el('jsonSearchInfo');
+
+        const reqJson = el('reqJson');
+
+        const btnCopyMd = el('btnCopyMd');
+        const btnDownloadMd = el('btnDownloadMd');
+        const btnCopyJson = el('btnCopyJson');
+        const btnDownloadJson = el('btnDownloadJson');
+        const btnCopyReqJson = el('btnCopyReqJson');
+        const btnDownloadReqJson = el('btnDownloadReqJson');
+        const btnCopyCsv = el('btnCopyCsv');
+        const btnDownloadCsv = el('btnDownloadCsv');
+        const btnApplySearch = el('btnApplySearch');
+        const btnClearSearch = el('btnClearSearch');
+
+        let selectedFile = null;
+        let lastData = null;
+        let lastRawJson = '';
+        let lastReqRawJson = '';
+        let lastLatencyMs = null;
+        let lastHttp = null;
+        let selectedImageDims = null;
+
+        const LS_OPT = 'hajri_debug_api_options_override_v1';
+        const LS_COURSE = 'hajri_debug_course_db_override_v1';
+
+        function loadOverrides() {
+            if (optOverride) optOverride.value = localStorage.getItem(LS_OPT) ?? '{}';
+            if (courseOverride) courseOverride.value = localStorage.getItem(LS_COURSE) ?? '{}';
+        }
+
+        function saveOverrides() {
+            if (optOverride) localStorage.setItem(LS_OPT, (optOverride.value ?? '').toString());
+            if (courseOverride) localStorage.setItem(LS_COURSE, (courseOverride.value ?? '').toString());
+        }
+
+        function normalizeJsonObject(text, label) {
+            const raw = (text ?? '').toString().trim();
+            if (!raw) return { ok: true, value: {}, raw: '{}' };
+            let obj;
+            try { obj = JSON.parse(raw); } catch (e) {
+                return { ok: false, error: `${label}: invalid JSON (${e?.message || e})` };
+            }
+            if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+                return { ok: false, error: `${label}: must be a JSON object {}` };
+            }
+            return { ok: true, value: obj, raw };
+        }
+
+        loadOverrides();
+        optOverride?.addEventListener('input', () => saveOverrides());
+        courseOverride?.addEventListener('input', () => saveOverrides());
+        btnResetOverrides?.addEventListener('click', () => {
+            if (optOverride) optOverride.value = '{}';
+            if (courseOverride) courseOverride.value = '{}';
+            saveOverrides();
+            setStatus('Overrides reset', 'ok');
+            setTimeout(() => setStatus(lastData ? 'Done' : 'Ready', lastData ? 'ok' : 'warn'), 1200);
+        });
+
+        function setStatus(text, kind) {
+            chipStatus.textContent = text;
+            chipStatus.className = `chip ${kind || ''}`.trim();
+        }
+
+        function setCourseStatus(text, kind) {
+            if (!courseStatus) return;
+            courseStatus.textContent = text || '';
+            courseStatus.style.color = (kind === 'bad') ? 'rgba(239, 68, 68, 0.95)'
+                : (kind === 'ok') ? 'rgba(34, 197, 94, 0.95)'
+                : 'rgba(255,255,255,0.65)';
+        }
+
+        function setSession(text, kind) {
+            if (!chipSession) return;
+            chipSession.textContent = text;
+            chipSession.className = `chip mono ${kind || ''}`.trim();
+        }
+
+        async function refreshSession() {
+            try {
+                const res = await fetch('/admin/me', { credentials: 'include' });
+                if (!res.ok) throw new Error('not authed');
+                const j = await res.json().catch(() => ({}));
+                const u = (j && j.username) ? j.username : 'admin';
+                setSession(`session: ${u}`, 'ok');
+                return true;
+            } catch (e) {
+                setSession('session: none', 'warn');
+                return false;
+            }
+        }
+
+        function _courseRowHtml(code, c) {
+            const name = (c?.name ?? '').toString();
+            const abbr = (c?.abbr ?? '').toString();
+            return `
+                <tr>
+                    <td class="mono">${esc(code)}</td>
+                    <td class="mono">${esc(abbr)}</td>
+                    <td>${esc(name)}</td>
+                    <td class="mono">
+                        <div class="course-actions">
+                            <button class="btn small" data-act="edit" data-code="${esc(code)}">Edit</button>
+                            <button class="btn small" data-act="del" data-code="${esc(code)}">Del</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        function _setCourseInputs(code, c) {
+            if (courseCode) courseCode.value = (code ?? '').toString();
+            if (courseAbbr) courseAbbr.value = (c?.abbr ?? '').toString();
+            if (courseName) courseName.value = (c?.name ?? '').toString();
+        }
+
+        function clearCourseInputs() {
+            _setCourseInputs('', { name: '', abbr: '' });
+            setCourseStatus('', '');
+        }
+
+        async function refreshCourses() {
+            if (!courseTbody) return;
+            setCourseStatus('loading…', 'warn');
+            courseTbody.innerHTML = '<tr><td colspan="4" class="hint">Loading…</td></tr>';
+            try {
+                const res = await fetch('/courses', { credentials: 'include' });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const j = await res.json();
+                const courses = (j && j.courses && typeof j.courses === 'object') ? j.courses : {};
+                const keys = Object.keys(courses).sort();
+                if (!keys.length) {
+                    courseTbody.innerHTML = '<tr><td colspan="4" class="hint">No courses configured.</td></tr>';
+                    setCourseStatus('ok', 'ok');
+                    return;
+                }
+                courseTbody.innerHTML = keys.map(k => _courseRowHtml(k, courses[k])).join('');
+                setCourseStatus(`loaded (${keys.length})`, 'ok');
+            } catch (e) {
+                courseTbody.innerHTML = `<tr><td colspan="4" class="hint">Failed to load courses: ${esc(e?.message || e)}</td></tr>`;
+                setCourseStatus(`load failed: ${e?.message || e}`, 'bad');
+            }
+        }
+
+        async function saveCourse() {
+            const code = (courseCode?.value ?? '').toString().trim().toUpperCase();
+            const abbr = (courseAbbr?.value ?? '').toString().trim();
+            const name = (courseName?.value ?? '').toString().trim();
+            if (!code) { setCourseStatus('Code required', 'bad'); return; }
+            if (!abbr) { setCourseStatus('Abbr required', 'bad'); return; }
+            if (!name) { setCourseStatus('Name required', 'bad'); return; }
+
+            setCourseStatus('saving…', 'warn');
+            try {
+                const res = await fetch(`/courses/${encodeURIComponent(code)}`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, abbr })
+                });
+                if (!res.ok) {
+                    const txt = await res.text().catch(() => '');
+                    throw new Error(txt || `HTTP ${res.status}`);
+                }
+                setCourseStatus('saved', 'ok');
+                await refreshCourses();
+            } catch (e) {
+                setCourseStatus(`save failed: ${e?.message || e}`, 'bad');
+            }
+        }
+
+        async function deleteCourse(code) {
+            const c = (code ?? '').toString().trim().toUpperCase();
+            if (!c) return;
+            if (!confirm(`Delete course ${c}?`)) return;
+            setCourseStatus('deleting…', 'warn');
+            try {
+                const res = await fetch(`/courses/${encodeURIComponent(c)}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                if (!res.ok) {
+                    const txt = await res.text().catch(() => '');
+                    throw new Error(txt || `HTTP ${res.status}`);
+                }
+                setCourseStatus('deleted', 'ok');
+                await refreshCourses();
+            } catch (e) {
+                setCourseStatus(`delete failed: ${e?.message || e}`, 'bad');
+            }
+        }
+
+        btnCourseSave?.addEventListener('click', () => saveCourse());
+        btnCourseClear?.addEventListener('click', () => clearCourseInputs());
+        btnCourseRefresh?.addEventListener('click', () => refreshCourses());
+
+        courseTbody?.addEventListener('click', (ev) => {
+            const t = ev.target;
+            const act = t?.getAttribute?.('data-act');
+            const code = t?.getAttribute?.('data-code');
+            if (!act || !code) return;
+            if (act === 'edit') {
+                // read values from row
+                const tr = t.closest('tr');
+                const tds = tr ? tr.querySelectorAll('td') : null;
+                const ab = (tds && tds[1]) ? tds[1].textContent : '';
+                const nm = (tds && tds[2]) ? tds[2].textContent : '';
+                _setCourseInputs(code, { abbr: ab, name: nm });
+                setCourseStatus('editing', 'warn');
+            } else if (act === 'del') {
+                deleteCourse(code);
+            }
+        });
+
+        async function refreshSessionTtl() {
+            try {
+                await fetch('/admin/refresh', { method: 'POST', credentials: 'include' });
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        function bytesHuman(n) {
+            if (n == null) return '—';
+            const kb = n / 1024;
+            if (kb < 1024) return `${kb.toFixed(1)} KB`;
+            return `${(kb / 1024).toFixed(2)} MB`;
+        }
+
+        function htmlEscape(s) {
+            return (s ?? '').toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function showError(message) {
+            errorWrap.style.display = 'block';
+            errorWrap.innerHTML = `<div class="errorbox">${htmlEscape(message)}</div>`;
+        }
+
+        function clearError() {
+            errorWrap.style.display = 'none';
+            errorWrap.innerHTML = '';
+        }
+
+        function setFile(file) {
+            selectedFile = file;
+            btnRun.disabled = false;
+            setStatus('Ready', 'warn');
+
+            mFile.textContent = file.name;
+            mSize.textContent = bytesHuman(file.size);
+            mDims.textContent = '…';
+            mAspect.textContent = '…';
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                previewImg.src = reader.result;
+                previewBox.style.display = 'flex';
+                const img = new Image();
+                img.onload = () => {
+                    selectedImageDims = { w: img.width, h: img.height };
+                    mDims.textContent = `${img.width} x ${img.height}`;
+                    mAspect.textContent = (img.width / img.height).toFixed(3);
+                };
+                img.src = reader.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files?.[0];
+            if (file && file.type.startsWith('image/')) setFile(file);
+        });
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files?.[0];
+            if (file) setFile(file);
+        });
+
+        function setTabs() {
+            const buttons = Array.from(document.querySelectorAll('.dt-tab[data-tab]'));
+            buttons.forEach(b => b.addEventListener('click', () => {
+                buttons.forEach(x => x.classList.remove('active'));
+                b.classList.add('active');
+                const tab = b.getAttribute('data-tab');
+                document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+                el(`panel-${tab}`).classList.add('active');
+            }));
+        }
+
+        setTabs();
+
+        btnLogout?.addEventListener('click', async () => {
+            try {
+                await fetch('/admin/logout', { method: 'POST', credentials: 'include' });
+            } finally {
+                window.location.href = '/admin/login?next=/debug.html';
+            }
+        });
+
+        // Session indicator + keep-alive (best-effort)
+        refreshSession();
+        window.addEventListener('focus', () => refreshSession());
+        setInterval(async () => {
+            const ok = await refreshSession();
+            if (ok) await refreshSessionTtl();
+        }, 5 * 60 * 1000);
+
+        function copyText(text, label) {
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                setStatus(`${label} copied`, 'ok');
+                setTimeout(() => setStatus(lastData ? 'Done' : 'Ready', lastData ? 'ok' : 'warn'), 1200);
+            });
+        }
+
+        function downloadText(filename, text, mime) {
+            if (!text) return;
+            const blob = new Blob([text], { type: mime || 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function entriesToCsv(entries) {
+            const header = ['course_code','shortname','course_name','class_type','present','total','percentage'];
+            const esc = (v) => `"${(v ?? '').toString().replace(/"/g, '""')}"`;
+            const rows = (entries || []).map(e => [e.course_code, e.shortname, e.course_name, e.class_type, e.present, e.total, e.percentage].map(esc).join(','));
+            return [header.join(','), ...rows].join('\n');
+        }
+
+        btnCopyMd.addEventListener('click', () => copyText(lastData?.markdown_text || '', 'Markdown'));
+        btnDownloadMd.addEventListener('click', () => downloadText('ocr_markdown.md', lastData?.markdown_text || '', 'text/markdown'));
+        btnCopyJson.addEventListener('click', () => copyText(JSON.stringify(lastData?.api_response || {}, null, 2), 'JSON'));
+        btnDownloadJson.addEventListener('click', () => downloadText('ocr_api_response.json', JSON.stringify(lastData?.api_response || {}, null, 2), 'application/json'));
+        btnCopyReqJson.addEventListener('click', () => copyText(lastReqRawJson || JSON.stringify(lastData?.request_payload || {}, null, 2), 'Request JSON'));
+        btnDownloadReqJson.addEventListener('click', () => downloadText('ocr_request_payload.json', lastReqRawJson || JSON.stringify(lastData?.request_payload || {}, null, 2), 'application/json'));
+        btnCopyCsv.addEventListener('click', () => copyText(entriesToCsv(lastData?.entries || []), 'CSV'));
+        btnDownloadCsv.addEventListener('click', () => downloadText('ocr_entries.csv', entriesToCsv(lastData?.entries || []), 'text/csv'));
+
+        btnCopyCurl.addEventListener('click', () => {
+            const url = `${location.origin}/ocr/debug`;
+            const opt = normalizeJsonObject(optOverride?.value, 'api_options_override');
+            const crs = normalizeJsonObject(courseOverride?.value, 'course_db_override');
+            let curl = `curl -X POST -F "file=@YOUR_IMAGE.png"`;
+            if (opt.ok && opt.raw && opt.raw.trim() !== '{}' ) curl += ` -F "api_options_override=${opt.raw.replace(/"/g, '\\"')}"`;
+            if (crs.ok && crs.raw && crs.raw.trim() !== '{}' ) curl += ` -F "course_db_override=${crs.raw.replace(/"/g, '\\"')}"`;
+            curl += ` ${url}`;
+            copyText(curl, 'cURL');
+        });
+
+        function sanitizeHtml(html) {
+            if (!html) return '';
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // Remove risky nodes
+            doc.querySelectorAll('script, style, link, iframe, object, embed').forEach(n => n.remove());
+
+            // Strip inline handlers + javascript: URLs
+            doc.querySelectorAll('*').forEach(node => {
+                Array.from(node.attributes || []).forEach(attr => {
+                    const name = (attr.name || '').toLowerCase();
+                    const value = (attr.value || '').toLowerCase();
+                    if (name.startsWith('on')) node.removeAttribute(attr.name);
+                    if ((name === 'href' || name === 'src') && value.startsWith('javascript:')) node.removeAttribute(attr.name);
+                });
+            });
+
+            return doc.body ? doc.body.innerHTML : '';
+        }
+
+        function setApiImagesFromResponse(api) {
+            const imgs = [];
+            const first = api?.layoutParsingResults?.[0];
+            const mdImgs = first?.markdown?.images || {};
+            const outImgs = first?.outputImages || api?.outputImages || {};
+            Object.values(mdImgs).forEach(u => imgs.push(u));
+            Object.values(outImgs).forEach(u => imgs.push(u));
+
+            if (!imgs.length) {
+                apiImagesWrap.style.display = 'none';
+                apiThumbs.innerHTML = '';
+                return;
+            }
+            apiImagesWrap.style.display = 'block';
+            apiThumbs.innerHTML = imgs.map(u => {
+                const safe = htmlEscape(u);
+                return `<div class="thumb"><a href="${safe}" target="_blank" rel="noopener"><img src="${safe}" alt="api" /></a></div>`;
+            }).join('');
+        }
+
+        function highlightInPre(preEl, text, query) {
+            if (!query) {
+                preEl.innerHTML = htmlEscape(text);
+                jsonSearchInfo.textContent = '';
+                return;
+            }
+            const lower = text.toLowerCase();
+            const q = query.toLowerCase();
+            let idx = 0;
+            let count = 0;
+            let out = '';
+            while (true) {
+                const next = lower.indexOf(q, idx);
+                if (next === -1) {
+                    out += htmlEscape(text.slice(idx));
+                    break;
+                }
+                out += htmlEscape(text.slice(idx, next));
+                out += `<mark style="background: rgba(245,158,11,0.35); color: rgba(255,255,255,0.92); padding: 0 2px; border-radius: 4px;">${htmlEscape(text.slice(next, next + query.length))}</mark>`;
+                idx = next + query.length;
+                count++;
+                if (count > 5000) break;
+            }
+            preEl.innerHTML = out;
+            jsonSearchInfo.textContent = count ? `${count} matches` : 'No matches';
+        }
+
+        btnApplySearch.addEventListener('click', () => {
+            if (!lastRawJson) return;
+            highlightInPre(apiJson, lastRawJson, jsonSearch.value.trim());
+        });
+        btnClearSearch.addEventListener('click', () => {
+            jsonSearch.value = '';
+            if (!lastRawJson) return;
+            highlightInPre(apiJson, lastRawJson, '');
+        });
+
+        async function runDebug() {
+            if (!selectedFile) return;
+            clearError();
+
+            btnRun.disabled = true;
+            setStatus('Running', 'warn');
+            chipTiming.textContent = '… ms';
+            chipTiming.className = 'chip mono';
+            lastData = null;
+            lastRawJson = '';
+            lastReqRawJson = '';
+            lastLatencyMs = null;
+            lastHttp = null;
+
+            reqJson.textContent = '—';
+
+            mHttp.textContent = '…';
+            mEntries.textContent = '…';
+            mMdLen.textContent = '…';
+            mFlags.textContent = '…';
+            ovEntries.textContent = '…';
+            ovMd.textContent = '…';
+            ovHttp.textContent = '…';
+            ovLatency.textContent = '…';
+            ovFlags.innerHTML = '<div class="hint">…</div>';
+            entriesEmpty.style.display = 'block';
+            entriesTable.style.display = 'none';
+            apiImagesWrap.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            // Overrides
+            const opt = normalizeJsonObject(optOverride?.value, 'api_options_override');
+            const crs = normalizeJsonObject(courseOverride?.value, 'course_db_override');
+            if (!opt.ok) {
+                setStatus('Overrides error', 'bad');
+                showError(opt.error);
+                btnRun.disabled = !selectedFile;
+                return;
+            }
+            if (!crs.ok) {
+                setStatus('Overrides error', 'bad');
+                showError(crs.error);
+                btnRun.disabled = !selectedFile;
+                return;
+            }
+            if ((opt.raw || '').trim() && (opt.raw || '').trim() !== '{}') formData.append('api_options_override', opt.raw);
+            if ((crs.raw || '').trim() && (crs.raw || '').trim() !== '{}') formData.append('course_db_override', crs.raw);
+
+            const start = performance.now();
+            let response = null;
+            try {
+                response = await fetch('/ocr/debug', { method: 'POST', body: formData });
+                lastLatencyMs = Math.round(performance.now() - start);
+                lastHttp = response.status;
+                chipTiming.textContent = `${lastLatencyMs} ms`;
+
+                mHttp.textContent = `${response.status} ${response.statusText}`;
+                ovHttp.textContent = `${response.status}`;
+                ovLatency.textContent = `${lastLatencyMs} ms`;
+
+                const rawText = await response.text();
+                let parsed;
+                try { parsed = JSON.parse(rawText); } catch { parsed = null; }
+
+                if (!response.ok) {
+                    setStatus('HTTP error', 'bad');
+                    showError(`HTTP ${response.status} ${response.statusText}\n\n${rawText.slice(0, 8000)}`);
+                    lastRawJson = parsed ? JSON.stringify(parsed, null, 2) : rawText;
+                    apiJson.textContent = lastRawJson;
+                    return;
+                }
+
+                if (!parsed) {
+                    setStatus('Bad JSON', 'bad');
+                    showError('Server returned non-JSON response.');
+                    apiJson.textContent = rawText;
+                    return;
+                }
+
+                lastData = parsed;
+                setStatus(parsed.success ? 'Done' : 'Error', parsed.success ? 'ok' : 'bad');
+
+                // Request payload (sanitized)
+                lastReqRawJson = JSON.stringify(parsed.request_payload || {}, null, 2);
+                reqJson.textContent = lastReqRawJson;
+
+                // Summary numbers
+                mEntries.textContent = parsed.entries_found ?? '—';
+                mMdLen.textContent = parsed.markdown_length ?? '—';
+
+                ovEntries.textContent = `${parsed.entries_found ?? '—'}`;
+                ovMd.textContent = `${parsed.markdown_length ?? '—'}`;
+
+                // Flags
+                const d = parsed.parsing_details || {};
+                const flags = [
+                    ['layoutParsingResults', !!d.has_layoutParsingResults],
+                    ['markdown', !!d.has_markdown],
+                    ['table tag', !!d.has_table_tag],
+                    ['img tag', !!d.has_img_tag]
+                ];
+                mFlags.innerHTML = flags.map(([name, ok]) => `<span class="chip ${ok ? 'ok' : 'bad'}">${name}</span>`).join(' ');
+                ovFlags.innerHTML = `<div class="row">${flags.map(([name, ok]) => `<span class="chip ${ok ? 'ok' : 'bad'}">${name}: ${ok ? 'yes' : 'no'}</span>`).join('')}</div>`;
+
+                // Markdown/HTML
+                mdRaw.textContent = parsed.markdown_text || '';
+                mdRender.innerHTML = parsed.markdown_text ? sanitizeHtml(parsed.markdown_text) : '<div class="hint">No markdown.</div>';
+
+                // Entries table
+                const entries = parsed.entries || [];
+                if (entries.length) {
+                    entriesEmpty.style.display = 'none';
+                    entriesTable.style.display = 'block';
+                    const head = ['course_code','shortname','course_name','class_type','present','total','percentage'];
+                    const th = head.map(h => `<th>${htmlEscape(h)}</th>`).join('');
+                    const rows = entries.map(e => {
+                        const cells = head.map(k => {
+                            let v = e[k];
+                            if (k === 'percentage' && typeof v === 'number') v = `${v.toFixed(1)}%`;
+
+                            if (k === 'course_name') {
+                                const src = (e.course_name_source || 'unknown').toString();
+                                const cls = src === 'ocr' ? 'ok' : (src === 'config' ? 'warn' : 'bad');
+                                const nameHtml = htmlEscape(v);
+                                const badge = `<span class="chip ${cls}" style="margin-left:8px;">${htmlEscape(src)}</span>`;
+                                return `<td>${nameHtml}${badge}</td>`;
+                            }
+
+                            return `<td>${htmlEscape(v)}</td>`;
+                        }).join('');
+                        return `<tr>${cells}</tr>`;
+                    }).join('');
+                    entriesTable.innerHTML = `<table><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table>`;
+                } else {
+                    entriesEmpty.style.display = 'block';
+                    entriesTable.style.display = 'none';
+                }
+
+                // API JSON
+                lastRawJson = JSON.stringify(parsed.api_response || {}, null, 2);
+                apiJson.textContent = lastRawJson;
+                jsonSearchInfo.textContent = '';
+
+                // API images
+                setApiImagesFromResponse(parsed.api_response || {});
+            } catch (err) {
+                lastLatencyMs = Math.round(performance.now() - start);
+                chipTiming.textContent = `${lastLatencyMs} ms`;
+                setStatus('Client error', 'bad');
+                showError(String(err?.message || err));
+            } finally {
+                btnRun.disabled = !selectedFile;
+            }
+        }
+
+        btnRun.addEventListener('click', runDebug);
+    </script>
+</body>
+</html>
